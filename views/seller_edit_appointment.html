@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Termin bearbeiten – WannCannaBis</title>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <img class="logo" src="/static/img/logo.png" alt="WannCannaBis Logo"/>
+    <span class="brand-name">WannCannaBis</span>
+  </div>
+  <nav>
+    <a href="/">Start</a>
+    <a href="/login">Login</a>
+    <a href="/register">Registrieren</a>
+    <a href="/admin">Admin</a>
+  </nav>
+</header>
+<main>
+  <div class="container">
+    <h1>Termin bearbeiten</h1>
+    <form method="post" action="">
+      <label for="start">Start (Datum &amp; Zeit):</label>
+      <input id="start" name="start" type="datetime-local" required />
+      <label for="end">Ende (Datum &amp; Zeit, optional):</label>
+      <input id="end" name="end" type="datetime-local" />
+      <label><input id="allDay" type="checkbox" name="allDay" value="1"/> Ganztägig</label>
+      <label for="location">Ort:</label>
+      <input id="location" name="location" required type="text" />
+      <button type="submit">Speichern</button>
+    </form>
+    <p><a href="/seller/dashboard">Zurück zum Dashboard</a></p>
+  </div>
+</main>
+<script>
+  // Populate form with appointment details passed from server
+  var appt = JSON.parse('{{{appointment}}}'.replace(/&quot;/g,'"'));
+  // Set form action
+  document.querySelector('form').action = '/seller/appointments/edit/' + appt.id;
+  var startVal = appt.start || appt.datetime || '';
+  var endVal = appt.end || '';
+  document.getElementById('start').value = startVal;
+  document.getElementById('end').value = endVal;
+  document.getElementById('allDay').checked = appt.allDay ? true : false;
+  document.getElementById('location').value = appt.location || '';
+</script>
+<footer>© WannCannaBis</footer>
+</body>
+</html>

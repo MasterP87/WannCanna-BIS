@@ -53,10 +53,17 @@
         } else {
           timeText = formatDateTime(startVal);
         }
+        // Build action column.  Sellers may edit or delete unbooked appointments.
+        let actionHtml = '';
+        if (!app.booked) {
+          actionHtml += '<a href="/seller/appointments/edit/' + app.id + '">Bearbeiten</a> ';
+          actionHtml += '<form method="post" action="/seller/appointments/delete/' + app.id + '" onsubmit="return confirm(\'Termin löschen?\');" style="display:inline; margin-left:0.5em;"><button type="submit">Löschen</button></form>';
+        }
         tr.innerHTML = `
           <td>${timeText}</td>
           <td>${app.location}</td>
           <td>${bookedStatus}</td>
+          <td>${actionHtml}</td>
         `;
         appointmentsTable.querySelector('tbody').appendChild(tr);
       });
@@ -129,6 +136,18 @@
       const msg = JSON.parse(event.data);
       if (msg.action === 'created') {
         appointments.push(msg.appointment);
+        render();
+      } else if (msg.action === 'updated') {
+        const idx = appointments.findIndex(a => a.id === msg.appointment.id);
+        if (idx >= 0) {
+          appointments[idx] = msg.appointment;
+        }
+        render();
+      } else if (msg.action === 'deleted') {
+        const idx = appointments.findIndex(a => a.id === msg.appointmentId);
+        if (idx >= 0) {
+          appointments.splice(idx, 1);
+        }
         render();
       }
     });

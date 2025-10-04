@@ -119,6 +119,71 @@ const DEFAULT_ADVERT_HTML =
 // necessary.
 const sessions = {};
 
+/**
+ * Remove expired appointments and related bookings.
+ *
+ * An appointment is considered expired when its end time (or start time
+ * if no end is provided) plus 24 hours lies in the past relative to
+ * the current system time.  All expired appointments are removed from
+ * the data store along with any associated bookings.  Bookings with
+ * a non‑active status (e.g. cancelled) are also purged.  Returns
+ * true if any records were removed, otherwise false.
+ *
+ * @param {Object} data The application state object
+ * @returns {boolean} Whether any data was removed
+ */
+function cleanupExpired(data) {
+  let changed = false;
+  const now = Date.now();
+  // Remove expired appointments
+  if (Array.isArray(data.appointments)) {
+    const remainingAppointments = [];
+    data.appointments.forEach(app => {
+      // Determine the end timestamp of the appointment.  For all‑day
+      // appointments we treat the end as the start plus one day.
+      let endTs = null;
+      try {
+        if (app.allDay) {
+          const s = new Date(app.start || app.datetime);
+          endTs = s.getTime() + 24 * 60 * 60 * 1000;
+        } else if (app.end) {
+          endTs = new Date(app.end).getTime();
+        } else if (app.start || app.datetime) {
+          endTs = new Date(app.start || app.datetime).getTime();
+        }
+      } catch (e) {
+        endTs = null;
+      }
+      // Add 24h grace period after end
+      const expiry = endTs ? (endTs + 24 * 60 * 60 * 1000) : null;
+      const isExpired = expiry && expiry < now;
+      if (isExpired) {
+        changed = true;
+        // Remove any bookings tied to this appointment
+        if (Array.isArray(data.bookings)) {
+          data.bookings = data.bookings.filter(b => b.appointmentId !== app.id);
+        }
+      } else {
+        remainingAppointments.push(app);
+      }
+    });
+    data.appointments = remainingAppointments;
+  }
+  // Purge any bookings that are not active (e.g. cancelled)
+  if (Array.isArray(data.bookings)) {
+    const remainingBookings = [];
+    data.bookings.forEach(b => {
+      if (b.status && b.status !== 'active') {
+        changed = true;
+      } else {
+        remainingBookings.push(b);
+      }
+    });
+    data.bookings = remainingBookings;
+  }
+  return changed;
+}
+
 // SSE event clients keyed by userId.  Each entry is an array of
 // { id, res } objects where id is a unique identifier for the connection
 // and res is the ServerResponse object.  When data changes, events are
@@ -434,6 +499,14 @@ function handleRequest(req, res) {
   const parsed = url.parse(req.url, true);
   const pathname = parsed.pathname;
   const data = readData();
+  // Periodically clean up expired appointments and stale bookings.  If
+  // any data is removed, persist the updated state.  Doing this at
+  // request time ensures that stale records disappear at most a few
+  // minutes after they expire.
+  const expiredRemoved = cleanupExpired(data);
+  if (expiredRemoved) {
+    writeData(data);
+  }
   // Ensure a default advert exists. If no advert has been defined yet,
   // initialise it with the default HTML. Persist the change so it
   // survives restarts. We perform this check here because readData()
@@ -447,6 +520,13 @@ function handleRequest(req, res) {
   // password is stored as a SHA‑256 hash to avoid persisting plain text.
   if (!data.admin) {
     data.admin = { username: 'admin', password: hashPassword('admin1234!') };
+    writeData(data);
+  }
+  // Ensure the codeRequests list exists for tracking seller code
+  // requests.  Without this property old installs will not have a
+  // codeRequests array.
+  if (!Array.isArray(data.codeRequests)) {
+    data.codeRequests = [];
     writeData(data);
   }
   const session = getSession(req, res);
@@ -537,18 +617,104 @@ if (pathname === '/admin/login' && req.method === 'POST') {
 if (pathname === '/admin/logout') { session.isAdmin = false; return redirect('/'); }
 function requireAdmin(){ return session.isAdmin === true; }
 
-if (pathname === '/admin') {
+// Admin backup of user data.  Returns a JSON document containing
+// all registered users.  Only accessible to admins.
+if (pathname === '/admin/backup/users' && req.method === 'GET') {
+  if (!requireAdmin()) return redirect('/admin/login');
+  const content = JSON.stringify(data.users || [], null, 2);
+  res.writeHead(200, {
+    'Content-Type': 'application/json',
+    'Content-Disposition': 'attachment; filename="users_backup.json"'
+  });
+  return res.end(content);
+}
+
+// Admin key management page.  Displays form to create new keys and
+// lists existing keys.  Accessible only to admins.
+if (pathname === '/admin/keys') {
   if (!requireAdmin()) return redirect('/admin/login');
   const keys = data.keys || [];
+  const html = renderTemplate('admin_keys', {
+    keys: JSON.stringify(keys)
+  });
+  return send(200, html);
+}
+
+// Admin sellers management page.  Lists all sellers with editing links.
+if (pathname === '/admin/sellers') {
+  if (!requireAdmin()) return redirect('/admin/login');
   const sellers = data.users.filter(u => u.type === 'seller');
-  // Provide list of buyers to the admin dashboard.  This allows the admin to see all registered buyers.
+  const html = renderTemplate('admin_sellers', {
+    sellers: JSON.stringify(sellers)
+  });
+  return send(200, html);
+}
+
+// Admin buyers management page.  Lists all buyers with editing links.
+if (pathname === '/admin/buyers') {
+  if (!requireAdmin()) return redirect('/admin/login');
   const buyers = data.users.filter(u => u.type === 'buyer');
-  const html = renderTemplate('admin_dashboard', {
-    keys: JSON.stringify(keys),
-    sellers: JSON.stringify(sellers),
+  const html = renderTemplate('admin_buyers', {
     buyers: JSON.stringify(buyers)
   });
   return send(200, html);
+}
+
+// Admin user edit page (GET).  Displays a form to edit a user's details.
+if (pathname.startsWith('/admin/users/edit/') && req.method === 'GET') {
+  if (!requireAdmin()) return redirect('/admin/login');
+  const idStr = pathname.split('/').pop();
+  const uid = parseInt(idStr, 10);
+  const usr = data.users.find(u => u.id === uid);
+  if (!usr) {
+    return send(404, 'Benutzer nicht gefunden');
+  }
+  const html = renderTemplate('admin_edit_user', {
+    user: JSON.stringify(usr),
+    returnPath: usr.type === 'seller' ? '/admin/sellers' : '/admin/buyers'
+  });
+  return send(200, html);
+}
+
+// Admin user edit submission (POST).  Updates the specified user.
+if (pathname.startsWith('/admin/users/edit/') && req.method === 'POST') {
+  if (!requireAdmin()) return redirect('/admin/login');
+  const idStr = pathname.split('/').pop();
+  const uid = parseInt(idStr, 10);
+  const usr = data.users.find(u => u.id === uid);
+  if (!usr) {
+    return send(404, 'Benutzer nicht gefunden');
+  }
+  collectPostData(req, body => {
+    const name = (body.name || '').trim();
+    const phone = (body.phone || '').trim();
+    const email = (body.email || '').trim();
+    const password = body.password || '';
+    if (name) usr.name = name;
+    if (phone) usr.phone = phone;
+    if (email) {
+      // Ensure no other user is using this email
+      const existing = data.users.find(u => u.id !== uid && u.email.toLowerCase() === email.toLowerCase());
+      if (existing) {
+        return send(400, 'E‑Mail bereits vergeben');
+      }
+      usr.email = email;
+    }
+    if (password) {
+      usr.password = hashPassword(password);
+    }
+    writeData(data);
+    // Redirect back to appropriate management page based on user type
+    const redirectPath = usr.type === 'seller' ? '/admin/sellers' : '/admin/buyers';
+    return redirect(redirectPath);
+  });
+  return;
+}
+
+// Default admin dashboard redirects to key management page.  Placed after
+// more specific admin routes so that those are matched first.
+if (pathname === '/admin') {
+  return redirect('/admin/keys');
 }
 if (pathname === '/admin/keys/create' && req.method === 'POST') {
   if (!requireAdmin()) return redirect('/admin/login');
@@ -572,7 +738,7 @@ if (pathname === '/admin/keys/create' && req.method === 'POST') {
     data.keys = data.keys || [];
     data.keys.push(key);
     writeData(data);
-    return redirect('/admin');
+    return redirect('/admin/keys');
   }); return;
 }
 if (pathname === '/admin/password' && req.method === 'POST') {
@@ -580,7 +746,9 @@ if (pathname === '/admin/password' && req.method === 'POST') {
   collectPostData(req, body => {
     const { oldpass, newpass } = body;
     if (data.admin.password !== hashPassword(oldpass)) return send(400,'Altes Passwort falsch');
-    data.admin.password = hashPassword(newpass); writeData(data); return redirect('/admin');
+    data.admin.password = hashPassword(newpass);
+    writeData(data);
+    return redirect('/admin/keys');
   }); return;
 }
 
@@ -952,6 +1120,111 @@ if (user && user.type === 'seller' && pathname.startsWith('/seller/products/dele
       broadcastEvent([booking.buyerId, user.id], 'booking', { action: 'cancelled', bookingId: booking.id });
       return redirect('/seller/dashboard');
     }
+
+  // Seller requests a freischaltcode.  When a seller visits this page,
+  // they can send a request to the admin to obtain a new key.  The
+  // request will be stored in data.codeRequests and can later be
+  // processed by an admin.  Only logged‑in sellers may access this.
+  if (pathname === '/seller/request-code') {
+    if (!user || user.type !== 'seller') {
+      return redirect('/login');
+    }
+    if (req.method === 'GET') {
+      const html = renderTemplate('seller_request_code', {});
+      return send(200, html);
+    }
+    if (req.method === 'POST') {
+      // Ensure codeRequests array exists
+      data.codeRequests = data.codeRequests || [];
+      // Avoid duplicate pending requests from the same seller
+      const existing = data.codeRequests.find(r => r.sellerId === user.id && r.status === 'pending');
+      if (!existing) {
+        data.codeRequests.push({ id: generateId(10), sellerId: user.id, createdAt: Date.now(), status: 'pending' });
+        writeData(data);
+      }
+      return redirect('/seller/dashboard');
+    }
+  }
+
+  // Seller edits an existing appointment.  Show the edit form.
+  if (pathname.startsWith('/seller/appointments/edit/') && req.method === 'GET') {
+    if (!user || user.type !== 'seller') {
+      return redirect('/login');
+    }
+    const idStr = pathname.split('/').pop();
+    const aid = parseInt(idStr, 10);
+    const appointment = data.appointments.find(a => a.id === aid);
+    if (!appointment || appointment.sellerId !== user.id) {
+      return send(404, 'Termin nicht gefunden');
+    }
+    // Render edit form with appointment data
+    const html = renderTemplate('seller_edit_appointment', {
+      appointment: JSON.stringify(appointment)
+    });
+    return send(200, html);
+  }
+  // Seller updates an appointment
+  if (pathname.startsWith('/seller/appointments/edit/') && req.method === 'POST') {
+    if (!user || user.type !== 'seller') {
+      return redirect('/login');
+    }
+    const idStr = pathname.split('/').pop();
+    const aid = parseInt(idStr, 10);
+    const appointment = data.appointments.find(a => a.id === aid);
+    if (!appointment || appointment.sellerId !== user.id) {
+      return send(404, 'Termin nicht gefunden');
+    }
+    // Prevent editing if appointment is booked
+    if (appointment.booked) {
+      return send(400, 'Gebuchte Termine können nicht geändert werden');
+    }
+    collectPostData(req, body => {
+      const start = body.start || body.datetime;
+      const end = body.end;
+      const allDay = body.allDay ? true : false;
+      const location = body.location;
+      if (!start || !location) {
+        return send(400, 'Datum/Zeit und Ort erforderlich');
+      }
+      if (!allDay && end) {
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate <= startDate) {
+          return send(400, 'Endzeit muss nach Startzeit liegen');
+        }
+      }
+      appointment.start = start;
+      appointment.datetime = start;
+      appointment.end = allDay ? null : (end || null);
+      appointment.allDay = allDay;
+      appointment.location = location;
+      writeData(data);
+      // Notify seller dashboard of updated appointment.  Use SSE event
+      broadcastEvent(user.id, 'appointment', { action: 'updated', appointment });
+      return redirect('/seller/dashboard');
+    });
+    return;
+  }
+  // Seller deletes an appointment that has not been booked
+  if (pathname.startsWith('/seller/appointments/delete/') && req.method === 'POST') {
+    if (!user || user.type !== 'seller') {
+      return redirect('/login');
+    }
+    const idStr = pathname.split('/').pop();
+    const aid = parseInt(idStr, 10);
+    const idx = data.appointments.findIndex(a => a.id === aid && a.sellerId === user.id);
+    if (idx < 0) {
+      return send(404, 'Termin nicht gefunden');
+    }
+    const appointment = data.appointments[idx];
+    if (appointment.booked) {
+      return send(400, 'Gebuchte Termine können nicht gelöscht werden');
+    }
+    data.appointments.splice(idx, 1);
+    writeData(data);
+    broadcastEvent(user.id, 'appointment', { action: 'deleted', appointmentId: aid });
+    return redirect('/seller/dashboard');
+  }
   }
 
   /* Buyer routes */

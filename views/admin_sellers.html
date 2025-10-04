@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Verkäuferverwaltung – WannCannaBis</title>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <img class="logo" src="/static/img/logo.png" alt="WannCannaBis Logo"/>
+    <span class="brand-name">WannCannaBis</span>
+  </div>
+  <nav>
+    <a href="/">Start</a>
+    <a href="/admin/logout">Logout</a>
+  </nav>
+</header>
+<main>
+  <div class="container">
+    <h1>Verkäuferverwaltung</h1>
+    <nav class="admin-menu" style="margin-bottom:1em;">
+      <a href="/admin/keys">Schlüssel</a> |
+      <a href="/admin/sellers">Verkäufer</a> |
+      <a href="/admin/buyers">Käufer</a> |
+      <a href="/admin/advert">Werbung</a> |
+      <a href="/admin/backup/users">Backup</a>
+    </nav>
+    <h3>Verkäuferliste</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th><th>E‑Mail</th><th>Telefon</th><th>Verkäufer‑Nr.</th><th>Gültig bis</th><th>Status</th><th>Aktion</th>
+          </tr>
+        </thead>
+        <tbody id="sellerRows"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+<script>
+  var sellers = JSON.parse('{{{sellers}}}'.replace(/&quot;/g, '"'));
+  function fmt(ts) {
+    if (!ts) return '—';
+    try {
+      return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ts));
+    } catch (e) {
+      return String(ts);
+    }
+  }
+  var tbody = document.getElementById('sellerRows');
+  sellers.forEach(function(s) {
+    var st;
+    if (!s.accessUntil) {
+      st = '—';
+    } else {
+      st = (Date.now() > s.accessUntil ? 'abgelaufen' : 'aktiv');
+    }
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + s.name + '</td>' +
+                   '<td>' + s.email + '</td>' +
+                   '<td>' + (s.phone || '') + '</td>' +
+                   '<td>' + s.sellerNumber + '</td>' +
+                   '<td>' + fmt(s.accessUntil) + '</td>' +
+                   '<td>' + st + '</td>' +
+                   '<td><a href="/admin/users/edit/' + s.id + '">Bearbeiten</a></td>';
+    tbody.appendChild(tr);
+  });
+</script>
+<footer>© WannCannaBis</footer>
+</body>
+</html>

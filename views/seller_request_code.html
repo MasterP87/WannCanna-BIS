@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Freischaltcode anfordern – WannCannaBis</title>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <img class="logo" src="/static/img/logo.png" alt="WannCannaBis Logo"/>
+    <span class="brand-name">WannCannaBis</span>
+  </div>
+  <nav>
+    <a href="/">Start</a>
+    <a href="/logout">Abmelden</a>
+  </nav>
+</header>
+<main>
+  <div class="container">
+    <h1>Freischaltcode anfordern</h1>
+    <p>Sie können hier einen neuen Freischaltcode bei einem Administrator anfordern. Nach dem Absenden der Anfrage wird ein Administrator Ihre Anfrage prüfen und Ihnen ggf. einen neuen Code zuteilen.</p>
+    <form method="post" action="/seller/request-code">
+      <button type="submit" class="btn btn-accent">Anfrage senden</button>
+    </form>
+    <p><a href="/seller/dashboard">Zurück zum Dashboard</a></p>
+  </div>
+</main>
+<footer>© WannCannaBis</footer>
+</body>
+</html>

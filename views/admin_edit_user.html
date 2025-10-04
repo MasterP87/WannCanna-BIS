@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Benutzer bearbeiten – WannCannaBis</title>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <img class="logo" src="/static/img/logo.png" alt="WannCannaBis Logo"/>
+    <span class="brand-name">WannCannaBis</span>
+  </div>
+  <nav>
+    <a href="/">Start</a>
+    <a href="/admin/logout">Logout</a>
+  </nav>
+</header>
+<main>
+  <div class="container">
+    <h1>Benutzer bearbeiten</h1>
+    <form method="post" action="">
+      <label>Name:<br/>
+        <input type="text" name="name" id="name" required />
+      </label><br/>
+      <label>Telefon:<br/>
+        <input type="text" name="phone" id="phone" />
+      </label><br/>
+      <label>E‑Mail:<br/>
+        <input type="email" name="email" id="email" required />
+      </label><br/>
+      <label>Neues Passwort (leer = unverändert):<br/>
+        <input type="password" name="password" id="password" />
+      </label><br/>
+      <button type="submit">Speichern</button>
+    </form>
+    <p><a id="backLink" href="#">Zurück</a></p>
+  </div>
+</main>
+<script>
+  // Populate form fields with user data passed from the server
+  var user = JSON.parse('{{{user}}}'.replace(/&quot;/g,'"'));
+  document.querySelector('form').action = '/admin/users/edit/' + user.id;
+  document.getElementById('name').value = user.name || '';
+  document.getElementById('phone').value = user.phone || '';
+  document.getElementById('email').value = user.email || '';
+  // Set back link
+  var returnPath = '{{returnPath}}';
+  document.getElementById('backLink').href = returnPath || '/admin/keys';
+</script>
+<footer>© WannCannaBis</footer>
+</body>
+</html>
