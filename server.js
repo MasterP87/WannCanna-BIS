@@ -3,6 +3,91 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const crypto = require('crypto');
+const { Client } = require('pg');
+
+// Database client and in-memory cache. If DATABASE_URL is provided,
+// data will be loaded from and persisted to PostgreSQL instead of the
+// local JSON file. This allows the application to survive instance
+// restarts and prevents data loss when the server sleeps.
+let dbClient = null;
+let dbData = null;
+
+/**
+ * Initialise a PostgreSQL connection and load the application state
+ * from the database. When using a database, all subsequent reads and
+ * writes go through the dbData object to keep an in-memory copy in sync.
+ */
+async function initDb() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    // No database configured – fallback to file-based storage
+    return;
+  }
+  dbClient = new Client({
+    connectionString: databaseUrl,
+    ssl: { rejectUnauthorized: false }
+  });
+  try {
+    await dbClient.connect();
+    // Ensure table exists
+    await dbClient.query(`
+      CREATE TABLE IF NOT EXISTS app_state (
+        id INTEGER PRIMARY KEY,
+        data JSONB NOT NULL
+      );
+    `);
+    // Load existing state or insert a default row
+    const result = await dbClient.query('SELECT data FROM app_state WHERE id = 1');
+    if (result.rows && result.rows.length > 0) {
+      dbData = result.rows[0].data;
+    } else {
+      // If no row exists, read from file and insert into DB
+      const fileData = readDataFromFile();
+      dbData = fileData;
+      await dbClient.query('INSERT INTO app_state (id, data) VALUES (1, $1::jsonb)', [JSON.stringify(fileData)]);
+    }
+    console.log('Database initialised – using persistent storage');
+  } catch (err) {
+    console.error('Failed to initialise database:', err);
+    // On failure, fall back to file-based storage
+    dbClient = null;
+    dbData = null;
+  }
+}
+
+/**
+ * Helper to read the data file directly. This bypasses the database logic
+ * and should only be used during initialisation or when no database is
+ * configured.
+ */
+function readDataFromFile() {
+  if (!fs.existsSync(DATA_FILE)) {
+    return {
+      users: [],
+      nextUserId: 1,
+      nextSellerNumber: 1,
+      appointments: [],
+      nextAppointmentId: 1,
+      bookings: [],
+      nextBookingId: 1
+    };
+  }
+  const raw = fs.readFileSync(DATA_FILE, 'utf8');
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error('Failed to parse data file:', err);
+    return {
+      users: [],
+      nextUserId: 1,
+      nextSellerNumber: 1,
+      appointments: [],
+      nextAppointmentId: 1,
+      bookings: [],
+      nextBookingId: 1
+    };
+  }
+}
 
 /*
  * This server implements a simple appointment booking system for two types of
@@ -36,8 +121,10 @@ const sseClients = {};
  * because they happen infrequently relative to user interactions.
  */
 function readData() {
-  if (!fs.existsSync(DATA_FILE)) {
-    return {
+  // If a DB client is available, return the cached state. The cache is kept
+  // in sync with the database by writeData().
+  if (dbClient) {
+    return dbData || {
       users: [],
       nextUserId: 1,
       nextSellerNumber: 1,
@@ -47,21 +134,8 @@ function readData() {
       nextBookingId: 1
     };
   }
-  const raw = fs.readFileSync(DATA_FILE, 'utf8');
-  try {
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error('Failed to parse data file:', err);
-    return {
-      users: [],
-      nextUserId: 1,
-      nextSellerNumber: 1,
-      appointments: [],
-      nextAppointmentId: 1,
-      bookings: [],
-      nextBookingId: 1
-    };
-  }
+  // Otherwise fall back to reading from the JSON file.
+  return readDataFromFile();
 }
 
 /**
@@ -70,7 +144,19 @@ function readData() {
  * operation.
  */
 function writeData(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  if (dbClient) {
+    // Update in-memory cache
+    dbData = data;
+    // Persist asynchronously to the database. Errors are logged but do not
+    // block the main thread.
+    dbClient
+      .query('UPDATE app_state SET data = $1::jsonb WHERE id = 1', [JSON.stringify(data)])
+      .catch(err => {
+        console.error('Failed to persist data to database:', err);
+      });
+  } else {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  }
 }
 
 /**
@@ -408,29 +494,13 @@ if (pathname === '/admin') {
 }
 if (pathname === '/admin/keys/create' && req.method === 'POST') {
   if (!requireAdmin()) return redirect('/admin/login');
-    collectPostData(req, body => {
-      const days = parseInt(body.days || '0', 10);
-      const code = (body.code || generateId(8)).toUpperCase();
-      const durationMs = Math.max(days, 1) * 24 * 60 * 60 * 1000;
-      // Lese maximale Nutzung aus dem Formular. Wenn kein Wert angegeben ist, verwende 1.
-      const maxUsesRaw = body.maxUses;
-      let maxUses = parseInt(maxUsesRaw, 10);
-      if (!maxUses || maxUses < 1) maxUses = 1;
-      const key = {
-        id: generateId(10),
-        code,
-        createdAt: Date.now(),
-        expiresAt: Date.now() + durationMs,
-        status: 'unused',
-        maxUses: maxUses,
-        usedBy: []
-      };
-      data.keys = data.keys || [];
-      data.keys.push(key);
-      writeData(data);
-      return redirect('/admin');
-    });
-    return;
+  collectPostData(req, body => {
+    const days = parseInt(body.days||'0',10);
+    const code = (body.code||generateId(8)).toUpperCase();
+    const durationMs = Math.max(days,1)*24*60*60*1000;
+    const key = { id: generateId(10), code, createdAt: Date.now(), expiresAt: Date.now()+durationMs, status: 'unused' };
+    data.keys = data.keys || []; data.keys.push(key); writeData(data); return redirect('/admin');
+  }); return;
 }
 if (pathname === '/admin/password' && req.method === 'POST') {
   if (!requireAdmin()) return redirect('/admin/login');
@@ -457,20 +527,10 @@ if (pathname === '/admin/password' && req.method === 'POST') {
       // Seller key check
 let accessUntil = null;
 if (type === 'seller') {
-  const key = (data.keys || []).find(k => k.code === String(sellerCode || '').trim());
-  if (!key) return send(400, 'Ungültiger Schlüssel');
-  // Prüfe, ob der Schlüssel noch nutzbar ist. Ist maxUses erreicht, lehne die Registrierung ab.
-  const usedCount = Array.isArray(key.usedBy) ? key.usedBy.length : (key.usedBy ? 1 : 0);
-  const allowed = key.maxUses || 1;
-  if (usedCount >= allowed) {
-    return send(400, 'Schlüssel hat die maximale Anzahl an Nutzungen erreicht');
-  }
-  // Wenn der Schlüssel einen Status hat, berücksichtigen, dass alte Versionen nur einen Nutzer erlauben.
-  if (key.status && key.status !== 'unused' && !Array.isArray(key.usedBy)) {
-    // Wenn usedBy kein Array ist, war der Schlüssel bereits genutzt.
-    return send(400, 'Schlüssel bereits verwendet');
-  }
-  if (key.expiresAt && Date.now() > key.expiresAt) return send(400, 'Schlüssel abgelaufen');
+  const key = (data.keys||[]).find(k => k.code === String(sellerCode||'').trim());
+  if (!key) return send(400,'Ungültiger Schlüssel');
+  if (key.status && key.status !== 'unused') return send(400,'Schlüssel bereits verwendet');
+  if (key.expiresAt && Date.now() > key.expiresAt) return send(400,'Schlüssel abgelaufen');
   accessUntil = key.expiresAt;
 }
 const newUser = {
@@ -486,25 +546,7 @@ const newUser = {
         newUser.sellerNumber = data.nextSellerNumber++;
       }
       data.users.push(newUser);
-      if (type === 'seller') {
-        const key = (data.keys || []).find(k => k.code === String(sellerCode || '').trim());
-        if (key) {
-          // Initialisiere usedBy als Array, falls noch nicht vorhanden oder falls altes Format verwendet wurde
-          if (!Array.isArray(key.usedBy)) {
-            key.usedBy = key.usedBy ? [key.usedBy] : [];
-          }
-          key.usedBy.push(newUser.id);
-          key.usedAt = Date.now();
-          // Wenn die maximale Nutzung erreicht ist, setze Status auf 'used'
-          const allowed = key.maxUses || 1;
-          if (key.usedBy.length >= allowed) {
-            key.status = 'used';
-          } else {
-            // Zwischenzustand anzeigen
-            key.status = 'partial';
-          }
-        }
-      }
+      if(type==='seller'){ const key = (data.keys||[]).find(k => k.code === String(sellerCode||'').trim()); if(key){ key.status='used'; key.usedBy=newUser.id; key.usedAt=Date.now(); } }
       writeData(data);
       return redirect('/login');
     });
@@ -952,14 +994,22 @@ function collectPostData(req, callback) {
 // Create HTTP server
 const server = http.createServer(handleRequest);
 
-// Start listening.  When the script is run directly (not imported), the
-// server will start.  This makes it possible to import server.js in
-// testing scenarios without automatically starting the server.
+// Start listening. When the script is run directly (not imported), initialise
+// the database (if configured) and then start the HTTP server. Initialising
+// the database first ensures that the in-memory state is loaded from a
+// persistent store before handling any requests.
 if (require.main === module) {
-  const PORT = process.env.PORT || 3000;
-  server.listen(PORT, () => {
-    console.log(`Server started on http://localhost:${PORT}`);
-  });
+  initDb()
+    .then(() => {
+      const PORT = process.env.PORT || 3000;
+      server.listen(PORT, () => {
+        console.log(`Server started on http://localhost:${PORT}`);
+      });
+    })
+    .catch(err => {
+      console.error('Fatal error during startup:', err);
+      process.exit(1);
+    });
 }
 
 module.exports = server;
