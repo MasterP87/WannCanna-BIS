@@ -488,18 +488,39 @@ function requireAdmin(){ return session.isAdmin === true; }
 if (pathname === '/admin') {
   if (!requireAdmin()) return redirect('/admin/login');
   const keys = data.keys || [];
-  const sellers = data.users.filter(u=>u.type==='seller');
-  const html = renderTemplate('admin_dashboard', { keys: JSON.stringify(keys), sellers: JSON.stringify(sellers) });
+  const sellers = data.users.filter(u => u.type === 'seller');
+  // Provide list of buyers to the admin dashboard.  This allows the admin to see all registered buyers.
+  const buyers = data.users.filter(u => u.type === 'buyer');
+  const html = renderTemplate('admin_dashboard', {
+    keys: JSON.stringify(keys),
+    sellers: JSON.stringify(sellers),
+    buyers: JSON.stringify(buyers)
+  });
   return send(200, html);
 }
 if (pathname === '/admin/keys/create' && req.method === 'POST') {
   if (!requireAdmin()) return redirect('/admin/login');
   collectPostData(req, body => {
-    const days = parseInt(body.days||'0',10);
-    const code = (body.code||generateId(8)).toUpperCase();
-    const durationMs = Math.max(days,1)*24*60*60*1000;
-    const key = { id: generateId(10), code, createdAt: Date.now(), expiresAt: Date.now()+durationMs, status: 'unused' };
-    data.keys = data.keys || []; data.keys.push(key); writeData(data); return redirect('/admin');
+    const days = parseInt(body.days || '0', 10);
+    const code = (body.code || generateId(8)).toUpperCase();
+    const durationMs = Math.max(days, 1) * 24 * 60 * 60 * 1000;
+    // Read the maximum number of users allowed for this key.  Default to 1 if not provided or invalid.
+    const maxUsesRaw = body.maxUses;
+    let maxUses = parseInt(maxUsesRaw, 10);
+    if (!maxUses || maxUses < 1) maxUses = 1;
+    const key = {
+      id: generateId(10),
+      code,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + durationMs,
+      status: 'unused',
+      maxUses: maxUses,
+      usedBy: []
+    };
+    data.keys = data.keys || [];
+    data.keys.push(key);
+    writeData(data);
+    return redirect('/admin');
   }); return;
 }
 if (pathname === '/admin/password' && req.method === 'POST') {
@@ -527,10 +548,30 @@ if (pathname === '/admin/password' && req.method === 'POST') {
       // Seller key check
 let accessUntil = null;
 if (type === 'seller') {
-  const key = (data.keys||[]).find(k => k.code === String(sellerCode||'').trim());
-  if (!key) return send(400,'Ungültiger Schlüssel');
-  if (key.status && key.status !== 'unused') return send(400,'Schlüssel bereits verwendet');
-  if (key.expiresAt && Date.now() > key.expiresAt) return send(400,'Schlüssel abgelaufen');
+  const key = (data.keys || []).find(k => k.code === String(sellerCode || '').trim());
+  if (!key) {
+    return send(400, 'Ungültiger Schlüssel');
+  }
+  // Determine how many times the key has been used.  For backwards compatibility,
+  // handle both array and single-value formats for usedBy.
+  let usedCount = 0;
+  if (Array.isArray(key.usedBy)) {
+    usedCount = key.usedBy.length;
+  } else if (key.usedBy) {
+    usedCount = 1;
+  }
+  const allowed = key.maxUses || 1;
+  // Reject if the key has reached its maximum usage count.
+  if (usedCount >= allowed) {
+    return send(400, 'Schlüssel hat die maximale Anzahl an Nutzungen erreicht');
+  }
+  // For older keys that only allowed one user, ensure they are not reused.
+  if (key.status && key.status !== 'unused' && !Array.isArray(key.usedBy)) {
+    return send(400, 'Schlüssel bereits verwendet');
+  }
+  if (key.expiresAt && Date.now() > key.expiresAt) {
+    return send(400, 'Schlüssel abgelaufen');
+  }
   accessUntil = key.expiresAt;
 }
 const newUser = {
@@ -546,7 +587,24 @@ const newUser = {
         newUser.sellerNumber = data.nextSellerNumber++;
       }
       data.users.push(newUser);
-      if(type==='seller'){ const key = (data.keys||[]).find(k => k.code === String(sellerCode||'').trim()); if(key){ key.status='used'; key.usedBy=newUser.id; key.usedAt=Date.now(); } }
+      if (type === 'seller') {
+        const key = (data.keys || []).find(k => k.code === String(sellerCode || '').trim());
+        if (key) {
+          // Ensure usedBy is an array for compatibility with the new multi-use logic.
+          if (!Array.isArray(key.usedBy)) {
+            key.usedBy = key.usedBy ? [key.usedBy] : [];
+          }
+          key.usedBy.push(newUser.id);
+          key.usedAt = Date.now();
+          const allowed = key.maxUses || 1;
+          if (key.usedBy.length >= allowed) {
+            key.status = 'used';
+          } else {
+            // When not fully used, show that some uses remain
+            key.status = 'partial';
+          }
+        }
+      }
       writeData(data);
       return redirect('/login');
     });
