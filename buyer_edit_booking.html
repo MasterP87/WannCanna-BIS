@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Buchung bearbeiten</title>
+
+<link href="/static/css/style.css" rel="stylesheet"/></head>
+<body>
+<header><div class="brand"><img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/><span class="brand-name">WannCannaBis</span></div><nav><a href="/">Start</a><a href="/login">Login</a><a href="/register">Registrieren</a><a href="/admin">Admin</a></nav></header>
+<main>
+<div class="container">
+<form action="/buyer/bookings/edit/{{bookingId}}" method="post">
+<label for="amount">Betrag:</label>
+<select id="amount" name="amount">
+          {{{optionsHtml}}}
+        </select>
+<button type="submit">Speichern</button>
+</form>
+<p><a href="/buyer/bookings">Zurück zu meinen Buchungen</a></p>
+</div>
+</main>
+<footer>© WannCannaBis</footer></body>
+</html>

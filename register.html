@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Registrierung</title>
+
+<link href="/static/css/style.css" rel="stylesheet"/></head>
+<body>
+<header><div class="brand"><img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/><span class="brand-name">WannCannaBis</span></div><nav><a href="/">Start</a><a href="/login">Login</a><a href="/register">Registrieren</a><a href="/admin">Admin</a></nav></header>
+<main>
+<div class="container">
+<form action="/register" method="post">
+<label for="type">Nutzerart:</label>
+<select id="type" name="type" required="">
+<option value="buyer">Käufer</option>
+<option value="seller">Verkäufer</option>
+</select>
+<label for="name">Name:</label>
+<input id="name" name="name" required="" type="text"/>
+<label for="phone">Telefonnummer:</label>
+<input id="phone" name="phone" required="" type="tel"/>
+<label for="email">E‑Mail:</label>
+<input id="email" name="email" required="" type="email"/>
+<label for="password">Passwort:</label>
+<input id="password" name="password" required="" type="password"/>
+<button type="submit">Registrieren</button>
+<label for="sellerCode">Schlüssel (nur Verkäufer)</label>
+        <input id="sellerCode" name="sellerCode" placeholder="Code vom Admin"/>
+        <div class="helper">Verkäufer benötigen einen gültigen Schlüssel des Admins.</div>
+      </form>
+<p>Bereits registriert? <a href="/login">Hier anmelden</a>.</p>
+</div>
+</main>
+<footer>© WannCannaBis</footer></body>
+</html>

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Verkäufer suchen</title>
+
+<link href="/static/css/style.css" rel="stylesheet"/></head>
+<body>
+<header><div class="brand"><img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/><span class="brand-name">WannCannaBis</span></div><nav><a href="/">Start</a><a href="/login">Login</a><a href="/register">Registrieren</a><a href="/admin">Admin</a></nav></header>
+<main>
+<div class="container">
+<form action="/buyer/lookup" method="post">
+<label for="sellerNumber">Verkäufernummer:</label>
+<input id="sellerNumber" name="sellerNumber" required="" type="number"/>
+<button type="submit">Anzeigen</button>
+</form>
+<p><a href="/buyer/dashboard">Zurück zum Dashboard</a></p>
+</div>
+</main>
+<footer>© WannCannaBis</footer></body>
+</html>
