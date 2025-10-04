@@ -18,39 +18,10 @@
       "email": "buyer1@example.com",
       "password": "9b8769a4a742959a2d0298c36fb70623f2dfacda8436237df08d8dfd5b37374c",
       "resetToken": null
-    },
-    {
-      "id": 3,
-      "type": "seller",
-      "name": "SellerTest1",
-      "phone": "111111",
-      "email": "test1@example.com",
-      "password": "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
-      "resetToken": null,
-      "sellerNumber": 2
-    },
-    {
-      "id": 4,
-      "type": "seller",
-      "name": "SellerTest2",
-      "phone": "222222",
-      "email": "test2@example.com",
-      "password": "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
-      "resetToken": null,
-      "sellerNumber": 3
-    },
-    {
-      "id": 5,
-      "type": "buyer",
-      "name": "BuyerTest",
-      "phone": "55555",
-      "email": "buyertest@example.com",
-      "password": "bd94dcda26fccb4e68d6a31f9b5aac0b571ae266d822620e901ef7ebe3a11d4f",
-      "resetToken": null
     }
   ],
-  "nextUserId": 6,
-  "nextSellerNumber": 4,
+  "nextUserId": 3,
+  "nextSellerNumber": 2,
   "appointments": [
     {
       "id": 1,
@@ -101,19 +72,6 @@
       "status": "used",
       "usedBy": 1,
       "usedAt": 1756088664981
-    },
-    {
-      "id": "ea28ac73b8ca19c588bc",
-      "code": "TESTCODE1",
-      "createdAt": 1759546788913,
-      "expiresAt": 1760410788913,
-      "status": "used",
-      "maxUses": 2,
-      "usedBy": [
-        3,
-        4
-      ],
-      "usedAt": 1759546800599
     }
   ],
   "approvals": [
