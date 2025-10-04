@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Verkäufer-Dashboard</title>
+<link href="/static/css/style.css" rel="stylesheet"/></head>
+<body onload="AppointmentApp.initSellerDashboard()">
+<header><div class="brand"><img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/><span class="brand-name">WannCannaBis</span></div><nav><a href="/">Start</a><a href="/login">Login</a><a href="/register">Registrieren</a><a href="/admin">Admin</a></nav></header>
+<main>
+<div class="container">
+<p>Willkommen, {{userName}} (Verkäufer-Nr.: {{sellerNumber}}) | <a href="/seller/products">Portfolio</a> | <a href="/seller/buyers">Käufer</a></p>
+<p><a href="/seller/appointments/new">Neuen Termin erstellen</a> | <a href="/logout">Abmelden</a></p>
+<h2>Termine</h2>
+<table id="appointmentsTable">
+<thead>
+<tr><th>Datum/Zeit</th><th>Ort</th><th>Gebucht</th></tr>
+</thead>
+<tbody></tbody>
+</table>
+<h2>Buchungen</h2>
+<table id="bookingsTable">
+<thead>
+<tr><th>Datum/Zeit</th><th>Ort</th><th>Käufer</th><th>Betrag</th><th>Aktion</th></tr>
+</thead>
+<tbody></tbody>
+</table>
+<p><strong>Gesamtsumme:</strong> <span id="total"></span></p>
+</div>
+</main>
+<script>
+    // Embedded data
+    var user = JSON.parse('{{{user}}}'.replace(/&quot;/g, '"'));
+    var appointments = JSON.parse('{{{appointments}}}'.replace(/&quot;/g, '"'));
+    var bookings = JSON.parse('{{{bookings}}}'.replace(/&quot;/g, '"'));
+    var total = {{total}};
+  </script>
+<script src="/static/js/app.js"></script>
+<footer>© WannCannaBis</footer></body>
+</html>

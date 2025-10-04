@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Meine Buchungen</title>
+
+<link href="/static/css/style.css" rel="stylesheet"/></head>
+<body onload="AppointmentApp.initBuyerBookings()">
+<header><div class="brand"><img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/><span class="brand-name">WannCannaBis</span></div><nav><a href="/">Start</a><a href="/login">Login</a><a href="/register">Registrieren</a><a href="/admin">Admin</a></nav></header>
+<main>
+<div class="container">
+<table id="buyerBookingsTable">
+<thead>
+<tr>
+<th>Verkäufer</th>
+<th>Datum/Zeit</th>
+<th>Ort</th>
+<th>Betrag</th>
+<th>Menge</th>
+<th>Bearbeiten</th>
+<th>Stornieren</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+<p><a href="/buyer/dashboard">Zurück zum Dashboard</a></p>
+</div>
+</main>
+<script>
+    const bookings = JSON.parse('{{{bookings}}}'.replace(/&quot;/g, '"'));
+    const appointments = JSON.parse('{{{appointments}}}'.replace(/&quot;/g, '"'));
+    const sellers = JSON.parse('{{{sellers}}}'.replace(/&quot;/g, '"'));
+  </script>
+<script src="/static/js/app.js"></script>
+<footer>© WannCannaBis</footer></body>
+</html>

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Anmeldung</title>
+
+<link href="/static/css/style.css" rel="stylesheet"/></head>
+<body>
+<header><div class="brand"><img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/><span class="brand-name">WannCannaBis</span></div><nav><a href="/">Start</a><a href="/login">Login</a><a href="/register">Registrieren</a><a href="/admin">Admin</a></nav></header>
+<main>
+<div class="container">
+      {{errorMessage}}
+      <form action="/login" method="post">
+<label for="email">E‑Mail:</label>
+<input id="email" name="email" required="" type="email"/>
+<label for="password">Passwort:</label>
+<input id="password" name="password" required="" type="password"/>
+<button type="submit">Anmelden</button>
+</form>
+<p>Passwort vergessen? <a href="/password-reset">Passwort zurücksetzen</a>.</p>
+<p>Noch kein Konto? <a href="/register">Hier registrieren</a>.</p>
+</div>
+</main>
+<footer>© WannCannaBis</footer></body>
+</html>

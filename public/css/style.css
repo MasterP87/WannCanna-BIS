@@ -1,0 +1,37 @@
+:root{--bg-image:url('/static/img/background.jpg');--primary:#16a34a;--primary-600:#15803d;--accent:#7c3aed;--accent-600:#6d28d9;--surface:rgba(255,255,255,0.86);--text:#0b1220;--muted:#5b6474;--ring:rgba(22,163,74,0.3);--shadow:0 10px 25px rgba(0,0,0,0.08);--radius:18px}
+*{box-sizing:border-box}
+html,body{height:100%}body{margin:0;font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial;color:var(--text);background:#e6f5ea;position:relative;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background-image:var(--bg-image);background-size:cover;background-position:center;filter:saturate(1.2) contrast(1.05);z-index:-2}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(1200px 800px at 20% 10%, rgba(255,255,255,0.85), transparent 60%),radial-gradient(900px 700px at 80% 80%, rgba(255,255,255,0.85), transparent 60%),linear-gradient(to bottom, rgba(255,255,255,0.75), rgba(255,255,255,0.9));z-index:-1}
+header{padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:.6rem;align-items:center;font-weight:800;letter-spacing:.2px}
+.brand .dot{width:12px;height:12px;border-radius:9999px;background:var(--accent);box-shadow:0 0 0 6px rgba(124,58,237,.15)}
+header nav a{text-decoration:none;padding:.6rem .9rem;border-radius:999px;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.06);box-shadow:var(--shadow);color:var(--text);font-weight:700;margin-left:.5rem}
+main{padding:.5rem 1rem 2rem}.container{max-width:980px;margin:.75rem auto;background:var(--surface);border:1px solid rgba(0,0,0,.06);border-radius:var(--radius);box-shadow:var(--shadow);backdrop-filter:blur(6px);padding:1.2rem}
+h1,h2,h3{margin:.25rem 0 1rem;line-height:1.2}.card{background:#fff;border-radius:calc(var(--radius) - 6px);padding:1rem;border:1px solid rgba(0,0,0,.06);box-shadow:var(--shadow)}.grid{display:grid;gap:1rem}@media(min-width:768px){.grid-cols-2{grid-template-columns:1fr 1fr}}
+form{display:grid;gap:.9rem}label{font-weight:600;color:var(--muted)}input,select,textarea{width:100%;padding:.9rem 1rem;border-radius:14px;border:1px solid rgba(0,0,0,.12);background:#fff;outline:none;font-size:1rem;transition:box-shadow .15s ease,border-color .15s ease,transform .02s ease}input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 6px var(--ring)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.85rem 1.1rem;border-radius:14px;border:1px solid transparent;font-weight:700;text-decoration:none;cursor:pointer;transition:transform .02s ease,filter .2s ease,box-shadow .2s ease;box-shadow:var(--shadow)}
+.btn:active{transform:translateY(1px)}.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{filter:brightness(1.05)}.btn-primary:focus{box-shadow:0 0 0 6px var(--ring)}.btn-accent{background:var(--accent);color:#fff}.btn-accent:hover{filter:brightness(1.05)}.btn-outline{background:rgba(255,255,255,.9);border-color:rgba(0,0,0,.12)}
+.helper{font-size:.9rem;color:var(--muted)}.table-wrap{overflow:auto;border-radius:12px;border:1px solid rgba(0,0,0,.06);background:#fff}table{width:100%;border-collapse:collapse;font-size:.95rem}th,td{padding:.75rem .9rem;border-bottom:1px solid rgba(0,0,0,.06)}th{text-align:left;color:var(--muted);font-weight:700;background:rgba(0,0,0,.02)}.banner{padding:.9rem 1rem;border:1px dashed rgba(0,0,0,.15);border-radius:14px;background:rgba(22,163,74,0.08)}footer{padding:1.2rem;font-size:.9rem;color:var(--muted);text-align:center}
+/* make links look like buttons globally */
+.container a, header nav a{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1rem;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:12px;text-decoration:none;color:var(--text);box-shadow:var(--shadow);font-weight:700}
+.container a:hover, header nav a:hover{filter:brightness(1.03)}
+.brand img.logo{width:32px;height:32px;object-fit:contain;border-radius:6px}.brand-name{font-weight:800;letter-spacing:.2px}
+@media(max-width:600px){.container{margin:.75rem .75rem;padding:1rem}}
+/* Responsive adjustments for mobile devices */
+@media (max-width: 600px) {
+  /* Stack header elements and left-align on small screens */
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  /* Make navigation links full width and add spacing */
+  header nav a {
+    margin-left: 0;
+    margin-top: 0.5rem;
+    width: 100%;
+  }
+  /* Ensure two-column grids collapse to a single column on small screens */
+  .grid-cols-2 {
+    grid-template-columns: 1fr !important;
+ }

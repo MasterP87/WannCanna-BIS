@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Verkäufer-Termine</title>
+
+<link href="/static/css/style.css" rel="stylesheet"/></head>
+<body onload="AppointmentApp.initBuyerViewSeller()">
+<header><div class="brand"><img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/><span class="brand-name">WannCannaBis</span></div><nav><a href="/">Start</a><a href="/login">Login</a><a href="/register">Registrieren</a><a href="/admin">Admin</a></nav></header>
+<main>
+  <div class="container">
+    <!-- Banner showing approval status and request action -->
+    <div id="approvalBanner"></div>
+    <ul id="appointmentList" style="list-style: none; padding: 0;"></ul>
+    <p><a href="/buyer/dashboard">Zurück</a></p>
+  </div>
+</main>
+
+<!-- Expose data for client-side script -->
+<script>
+  // Declare variables with var so they are globally accessible across
+  // scripts in all browsers.
+  var seller = JSON.parse('{{{seller}}}'.replace(/&quot;/g, '"'));
+  var appointments = JSON.parse('{{{appointments}}}'.replace(/&quot;/g, '"'));
+  var products = JSON.parse('{{{products}}}'.replace(/&quot;/g, '"'));
+  var tiers = JSON.parse('{{{tiers}}}'.replace(/&quot;/g, '"'));
+  var approved = '{{approved}}' === 'true';
+  var requested = '{{requested}}' === 'true';
+  var sellerNumber = '{{sellerNumber}}';
+</script>
+<script src="/static/js/app.js"></script>
+<script>
+  // Render the approval banner on page load.  If the buyer is not approved
+  // yet, provide a button to request approval.  The banner will be updated
+  // server‑side after approval.
+  (function(){
+    var banner = document.getElementById('approvalBanner');
+    if (!banner) return;
+    if (approved) {
+      banner.textContent = 'Du bist für Buchungen freigeschaltet.';
+    } else if (requested) {
+      banner.innerHTML = '<strong>Freischaltungsanfrage gesendet.</strong> Bitte warte auf Freigabe.';
+    } else {
+      banner.innerHTML = '<strong>Freischaltung erforderlich.</strong> ' +
+        '<form method="post" action="/buyer/request-approval/' + sellerNumber + '" style="display:inline">' +
+        '<button type="submit" class="btn btn-accent">Freischaltung anfordern</button>' +
+        '</form>';
+    }
+  })();
+  // Utility to resolve a unit price from a list of tiers.  Returns null
+  // if no applicable tier is found.
+  function resolveUnitPrice(ts, amount) {
+    if (!ts || !ts.length) return null;
+    var a = Number(amount) || 0;
+    var price = null;
+    ts.forEach(function(t) {
+      if (a >= Number(t.minAmount)) price = Number(t.unitPrice);
+    });
+    return price;
+  }
+</script>
+<footer>© WannCannaBis</footer>
+</body>
+</html>

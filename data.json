@@ -1,0 +1,132 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "type": "seller",
+      "name": "SellerOne",
+      "phone": "123456",
+      "email": "seller1@example.com",
+      "password": "9b8769a4a742959a2d0298c36fb70623f2dfacda8436237df08d8dfd5b37374c",
+      "resetToken": null,
+      "sellerNumber": 1
+    },
+    {
+      "id": 2,
+      "type": "buyer",
+      "name": "BuyerOne",
+      "phone": "987654",
+      "email": "buyer1@example.com",
+      "password": "9b8769a4a742959a2d0298c36fb70623f2dfacda8436237df08d8dfd5b37374c",
+      "resetToken": null
+    },
+    {
+      "id": 3,
+      "type": "seller",
+      "name": "SellerTest1",
+      "phone": "111111",
+      "email": "test1@example.com",
+      "password": "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
+      "resetToken": null,
+      "sellerNumber": 2
+    },
+    {
+      "id": 4,
+      "type": "seller",
+      "name": "SellerTest2",
+      "phone": "222222",
+      "email": "test2@example.com",
+      "password": "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
+      "resetToken": null,
+      "sellerNumber": 3
+    },
+    {
+      "id": 5,
+      "type": "buyer",
+      "name": "BuyerTest",
+      "phone": "55555",
+      "email": "buyertest@example.com",
+      "password": "bd94dcda26fccb4e68d6a31f9b5aac0b571ae266d822620e901ef7ebe3a11d4f",
+      "resetToken": null
+    }
+  ],
+  "nextUserId": 6,
+  "nextSellerNumber": 4,
+  "appointments": [
+    {
+      "id": 1,
+      "sellerId": 1,
+      "datetime": "2025-09-01T10:00",
+      "location": "Wald",
+      "booked": true,
+      "bookingId": 1
+    }
+  ],
+  "nextAppointmentId": 2,
+  "bookings": [
+    {
+      "id": 1,
+      "appointmentId": 1,
+      "buyerId": 2,
+      "amount": 50,
+      "status": "active"
+    }
+  ],
+  "nextBookingId": 2,
+  "products": [
+    {
+      "id": "b5cb1ae21496e2dbc694c344",
+      "sellerId": 1,
+      "name": "ProduktA",
+      "createdAt": 1756088664994,
+      "prices": {
+        "2": [
+          {
+            "minAmount": 0,
+            "unitPrice": 10
+          },
+          {
+            "minAmount": 100,
+            "unitPrice": 9.5
+          }
+        ]
+      }
+    }
+  ],
+  "keys": [
+    {
+      "id": "3aec2b83a7dcde5f8933",
+      "code": "1DA059EF03A8B112",
+      "createdAt": 1756088664956,
+      "expiresAt": 1756175064956,
+      "status": "used",
+      "usedBy": 1,
+      "usedAt": 1756088664981
+    },
+    {
+      "id": "ea28ac73b8ca19c588bc",
+      "code": "TESTCODE1",
+      "createdAt": 1759546788913,
+      "expiresAt": 1760410788913,
+      "status": "used",
+      "maxUses": 2,
+      "usedBy": [
+        3,
+        4
+      ],
+      "usedAt": 1759546800599
+    }
+  ],
+  "approvals": [
+    {
+      "id": "c64a36414120ccb7506f",
+      "sellerId": 1,
+      "buyerId": 2,
+      "status": "approved",
+      "createdAt": 1756088665034
+    }
+  ],
+  "admin": {
+    "username": "admin",
+    "password": "b0d107a1cb94cd60c513a8636f99b8d700154887e2a96f0310a1b5f3e60a6ddd"
+  }
+}
