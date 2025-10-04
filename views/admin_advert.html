@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Werbung bearbeiten – Admin</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="/static/img/logo.png" alt="WannCannaBis Logo" class="logo" />
+      <span class="brand-name">WannCannaBis</span>
+    </div>
+    <nav>
+      <a href="/">Start</a>
+      <a href="/admin">Admin‑Dashboard</a>
+      <a href="/logout">Logout</a>
+    </nav>
+  </header>
+  <main>
+    <div class="container">
+      <h1>Werbung bearbeiten</h1>
+      <p>In diesem Formular können Sie den HTML‑Code für die Werbefläche anpassen. Der Inhalt wird
+        auf der Startseite und im Admin‑Dashboard im eingebetteten Fenster angezeigt.</p>
+      <form action="/admin/advert" method="POST">
+        <textarea name="content" rows="10" style="width:100%;">{{{advert}}}</textarea>
+        <p style="margin-top:0.5em;">Sie können hier beliebigen HTML‑Code eingeben, zum Beispiel einen Link,
+          ein Bild oder formatierten Text. Lassen Sie das Feld leer, um zum Standardtext
+          zurückzukehren.</p>
+        <button type="submit">Speichern</button>
+      </form>
+    </div>
+  </main>
+  <footer>© WannCannaBis</footer>
+</body>
+</html>

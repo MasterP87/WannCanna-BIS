@@ -37,8 +37,24 @@
       appointments.forEach(app => {
         const tr = document.createElement('tr');
         const bookedStatus = app.booked ? 'Ja' : 'Nein';
+        // Determine display string for date/time.  Support allDay and end times.
+        let timeText;
+        const startVal = app.start || app.datetime;
+        const endVal = app.end;
+        if (app.allDay) {
+          try {
+            const d = new Date(startVal);
+            timeText = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(d) + ' (ganztägig)';
+          } catch (e) {
+            timeText = startVal;
+          }
+        } else if (endVal) {
+          timeText = formatDateTime(startVal) + ' – ' + formatDateTime(endVal);
+        } else {
+          timeText = formatDateTime(startVal);
+        }
         tr.innerHTML = `
-          <td>${formatDateTime(app.datetime)}</td>
+          <td>${timeText}</td>
           <td>${app.location}</td>
           <td>${bookedStatus}</td>
         `;
@@ -48,9 +64,25 @@
       bookings.forEach(b => {
         const appointment = appointments.find(a => a.id === b.appointmentId);
         if (!appointment) return;
+        // Determine time text similar to appointments view
+        let timeText;
+        const startVal = appointment.start || appointment.datetime;
+        const endVal = appointment.end;
+        if (appointment.allDay) {
+          try {
+            const d = new Date(startVal);
+            timeText = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(d) + ' (ganztägig)';
+          } catch (e) {
+            timeText = startVal;
+          }
+        } else if (endVal) {
+          timeText = formatDateTime(startVal) + ' – ' + formatDateTime(endVal);
+        } else {
+          timeText = formatDateTime(startVal);
+        }
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${formatDateTime(appointment.datetime)}</td>
+          <td>${timeText}</td>
           <td>${appointment.location}</td>
           <td>${b.buyerName || 'Unbekannt'}</td>
           <td>${b.amount.toFixed(2)} €</td>
@@ -118,13 +150,30 @@
       appointments.forEach(app => {
         const li = document.createElement('li');
         const isBooked = app.booked;
-        let html = `<span>${formatDateTime(app.datetime)} - ${app.location} ${isBooked ? '(gebucht)' : ''}</span>`;
+        // Compute time display for appointment
+        let timeText;
+        const startVal = app.start || app.datetime;
+        const endVal = app.end;
+        if (app.allDay) {
+          try {
+            const d = new Date(startVal);
+            timeText = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(d) + ' (ganztägig)';
+          } catch (e) {
+            timeText = startVal;
+          }
+        } else if (endVal) {
+          timeText = formatDateTime(startVal) + ' – ' + formatDateTime(endVal);
+        } else {
+          timeText = formatDateTime(startVal);
+        }
+        let html = `<span>${timeText} - ${app.location} ${isBooked ? '(gebucht)' : ''}</span>`;
         if (!isBooked) {
           if (approvedFlag) {
-            // Build select options for products
+            // Build select options for products including current stock
             let options = '';
             products.forEach(p => {
-              options += `<option value="${p.id}">${p.name}</option>`;
+              const stockText = (p.stock !== undefined ? ` (Verfügbar: ${p.stock})` : '');
+              options += `<option value="${p.id}">${p.name}${stockText}</option>`;
             });
             html += `\n<select class="productSelect">${options}</select>\n`;
             html += `<input type="number" class="amountInput" min="5" max="500" step="5" placeholder="Betrag">`;
@@ -159,7 +208,14 @@
           return;
         }
         const q = Math.floor((amountVal / price) * 100) / 100;
-        qtySpan.textContent = `→ ${q} Stk.`;
+        const product = products.find(p => p.id === productId);
+        let msg = `→ ${q} Stk.`;
+        if (product && typeof product.stock === 'number') {
+          if (q > product.stock) {
+            msg += ` (max ${product.stock} verfügbar)`;
+          }
+        }
+        qtySpan.textContent = msg;
       }
     });
     // Handle booking click
@@ -186,6 +242,11 @@
           return;
         }
         const q = Math.floor((amountVal / price) * 100) / 100;
+        const product = products.find(p => p.id === productId);
+        if (product && typeof product.stock === 'number' && q > product.stock) {
+          alert('Der Verkäufer hat nur ' + product.stock + ' Stück verfügbar. Bitte Menge verringern.');
+          return;
+        }
         if (!confirm(`Du erhältst ${q} Stück. Buchung ausführen?`)) {
           return;
         }
@@ -218,6 +279,22 @@
         }
       }
       render();
+    });
+
+    // Listen for stock update events.  When a stock event is received,
+    // update the local products array and re-render the appointment list
+    // so that stock information and quantity checks are correct.
+    es.addEventListener('stock', event => {
+      try {
+        const msg = JSON.parse(event.data);
+        const product = products.find(p => p.id === msg.productId);
+        if (product) {
+          product.stock = msg.stock;
+          render();
+        }
+      } catch (e) {
+        console.error('Fehler beim Verarbeiten des Stock-Events', e);
+      }
     });
   }
 

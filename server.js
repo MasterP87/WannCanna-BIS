@@ -104,6 +104,16 @@ function readDataFromFile() {
 const DATA_FILE = path.join(__dirname, 'data.json');
 const SESSION_TIMEOUT_MS = 1000 * 60 * 60 * 24; // 24 hours
 
+// Default advertisement HTML. This will be used whenever no custom advert
+// has been saved yet. Admins can change the advert via the new
+// /admin/advert page. The content is stored alongside the other app state
+// in the database (if configured) or in the JSON file.
+const DEFAULT_ADVERT_HTML =
+  '<div style="background-color:#e8e8e8;width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;">' +
+  '<h2>Werbefläche</h2>' +
+  '<p>Hier könnte Ihre Werbung stehen.</p>' +
+  '</div>';
+
 // In‑memory session store.  When the server restarts sessions will be
 // invalidated; persistent sessions could be stored in the data file if
 // necessary.
@@ -330,7 +340,31 @@ function renderTemplate(name, data = {}) {
  */
 /* New helpers: approvals and products */
 function findSellerProducts(data, sellerId){ return data.products ? data.products.filter(p => p.sellerId === sellerId) : []; }
-function createProduct(data, sellerId, name){ const id = generateId(12); data.products = data.products||[]; data.products.push({ id, sellerId, name, createdAt: Date.now(), prices: {} }); return id; }
+/**
+ * Create a new product for a seller.  Accepts an optional stock value.
+ * Stock should be a number (or null) representing available units.  If no stock
+ * is provided, the property is omitted to maintain backwards compatibility.
+ */
+function createProduct(data, sellerId, name, stock = null){
+  const id = generateId(12);
+  data.products = data.products||[];
+  const product = {
+    id,
+    sellerId,
+    name,
+    createdAt: Date.now(),
+    prices: {}
+  };
+  // If a stock value is supplied, ensure it's a number and attach it to product.
+  if (stock !== null && stock !== undefined && stock !== '') {
+    const s = Number(stock);
+    if (!isNaN(s) && s >= 0) {
+      product.stock = s;
+    }
+  }
+  data.products.push(product);
+  return id;
+}
 // Helpers for buyer/seller approval.  Always convert IDs to numbers to avoid
 // inconsistent string/number comparisons.  Approvals are stored in
 // `data.approvals` with numeric sellerId and buyerId.  Status can be
@@ -400,6 +434,14 @@ function handleRequest(req, res) {
   const parsed = url.parse(req.url, true);
   const pathname = parsed.pathname;
   const data = readData();
+  // Ensure a default advert exists. If no advert has been defined yet,
+  // initialise it with the default HTML. Persist the change so it
+  // survives restarts. We perform this check here because readData()
+  // may return a persisted object without an advertHtml property.
+  if (!data.advertHtml) {
+    data.advertHtml = DEFAULT_ADVERT_HTML;
+    writeData(data);
+  }
   // Ensure a default admin account exists.  If no admin is defined in
   // the data store, initialize one with the default credentials.  The
   // password is stored as a SHA‑256 hash to avoid persisting plain text.
@@ -441,6 +483,16 @@ function handleRequest(req, res) {
       }
     });
     return;
+  }
+
+  // Public advert endpoint. This serves the current advertisement HTML
+  // directly. It is used by the embedded iframes on the home and admin
+  // pages. Respond with plain HTML so that the iframe content is
+  // rendered correctly.
+  if (pathname === '/advert' && req.method === 'GET') {
+    const advertContent = data.advertHtml || DEFAULT_ADVERT_HTML;
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    return res.end(advertContent);
   }
 
   // Helper for sending plain text or HTML responses
@@ -531,6 +583,27 @@ if (pathname === '/admin/password' && req.method === 'POST') {
     data.admin.password = hashPassword(newpass); writeData(data); return redirect('/admin');
   }); return;
 }
+
+ // Admin advert management. Allows the admin to view and edit the current
+ // advertisement HTML. Only accessible to logged-in admins. When the
+ // admin submits new content, it is saved in the persistent data and the
+ // user is redirected back to the dashboard.
+ if (pathname === '/admin/advert' && req.method === 'GET') {
+   if (!requireAdmin()) return redirect('/admin/login');
+   const html = renderTemplate('admin_advert', { advert: data.advertHtml || DEFAULT_ADVERT_HTML });
+   return send(200, html);
+ }
+ if (pathname === '/admin/advert' && req.method === 'POST') {
+   if (!requireAdmin()) return redirect('/admin/login');
+   collectPostData(req, body => {
+     const content = body.content || '';
+     // Persist the new advertisement. If empty, revert to default.
+     data.advertHtml = content.trim() ? content : DEFAULT_ADVERT_HTML;
+     writeData(data);
+     return redirect('/admin');
+   });
+   return;
+ }
 // Registration page
   if (pathname === '/register' && req.method === 'GET') {
     const html = renderTemplate('register', {});
@@ -700,8 +773,21 @@ if (user && user.type === 'seller' && pathname === '/seller/products' && req.met
 if (user && user.type === 'seller' && pathname === '/seller/products' && req.method === 'POST') {
   collectPostData(req, body => {
     const name = (body.name||'').trim();
-    if(!name) return send(400,'Produktname erforderlich');
-    createProduct(data, user.id, name); writeData(data);
+    // Parse stock from form; if provided, ensure it is a non-negative number
+    const stockRaw = body.stock;
+    let stockVal = null;
+    if (stockRaw !== undefined && stockRaw !== null && stockRaw !== '') {
+      const s = parseFloat(stockRaw);
+      if (isNaN(s) || s < 0) {
+        return send(400, 'Ungültiger Bestand');
+      }
+      stockVal = s;
+    }
+    if(!name) {
+      return send(400,'Produktname erforderlich');
+    }
+    createProduct(data, user.id, name, stockVal);
+    writeData(data);
     return redirect('/seller/products');
   }); return;
 }
@@ -711,6 +797,43 @@ if (user && user.type === 'seller' && pathname.startsWith('/seller/products/dele
   if(idx>=0){ data.products.splice(idx,1); writeData(data); }
   return redirect('/seller/products');
 }
+
+    // Update product stock.  Accepts POST to /seller/products/stock/:id with a
+    // 'stock' field.  Only the owning seller may update the stock.  After
+    // updating, broadcasts a 'stock' SSE event to the seller and approved
+    // buyers.
+    if (user && user.type === 'seller' && pathname.startsWith('/seller/products/stock/') && req.method === 'POST') {
+      // Extract product ID from path
+      const parts = pathname.split('/');
+      const prodId = parts[parts.length - 1];
+      const product = (data.products || []).find(p => p.id === prodId && p.sellerId === user.id);
+      if (!product) {
+        return send(404, 'Produkt nicht gefunden');
+      }
+      collectPostData(req, body => {
+        const stockRaw = body.stock;
+        if (stockRaw === undefined || stockRaw === null || stockRaw === '') {
+          return send(400, 'Bestand erforderlich');
+        }
+        const s = parseFloat(stockRaw);
+        if (isNaN(s) || s < 0) {
+          return send(400, 'Ungültiger Bestand');
+        }
+        product.stock = s;
+        writeData(data);
+        // Broadcast updated stock to seller and approved buyers for this seller
+        // Send to seller
+        broadcastEvent(user.id, 'stock', { productId: product.id, stock: product.stock });
+        // Also send to each approved buyer
+        const approved = (data.approvals || []).filter(a => a.sellerId === user.id && a.status === 'approved');
+        const buyerIds = approved.map(a => a.buyerId);
+        if (buyerIds.length > 0) {
+          broadcastEvent(buyerIds, 'stock', { productId: product.id, stock: product.stock });
+        }
+        return redirect('/seller/products');
+      });
+      return;
+    }
 
 /* Seller routes */
   // Buyers management
@@ -769,14 +892,33 @@ if (user && user.type === 'seller' && pathname.startsWith('/seller/products/dele
     }
     if (pathname === '/seller/appointments/new' && req.method === 'POST') {
       collectPostData(req, body => {
-        const { datetime, location } = body;
-        if (!datetime || !location) {
+        // Accept start, optional end and allDay flags for new appointments.  A
+        // start (datetime-local) and location are required.  If allDay is
+        // checked, the end field will be ignored.  For compatibility with
+        // existing code, we also set the `datetime` property equal to the
+        // start value.
+        const start = body.start || body.datetime;
+        const end = body.end;
+        const allDay = body.allDay ? true : false;
+        const location = body.location;
+        if (!start || !location) {
           return send(400, 'Datum/Zeit und Ort erforderlich');
+        }
+        // Validate that end, if provided, is after start and in the same day if needed.
+        if (!allDay && end) {
+          const startDate = new Date(start);
+          const endDate = new Date(end);
+          if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate <= startDate) {
+            return send(400, 'Endzeit muss nach Startzeit liegen');
+          }
         }
         const appointment = {
           id: data.nextAppointmentId++,
           sellerId: user.id,
-          datetime,
+          datetime: start,
+          start,
+          end: allDay ? null : (end || null),
+          allDay,
           location,
           booked: false,
           bookingId: null
@@ -915,6 +1057,20 @@ if (user && user.type === 'seller' && pathname.startsWith('/seller/products/dele
           return send(400, 'Preis/Staffel nicht gesetzt oder Betrag zu niedrig');
         }
         const quantity = Math.floor((amt / unitPrice) * 100) / 100;
+        // Check available stock for the selected product.  If stock is defined
+        // and the requested quantity exceeds it, reject the booking.
+        if (product.stock !== undefined && product.stock !== null) {
+          const available = Number(product.stock);
+          if (quantity > available) {
+            return send(400, 'Nicht genügend Bestand verfügbar');
+          }
+        }
+        // Reduce stock by the quantity booked.  If no stock property exists,
+        // skip this step (legacy products may not have stock defined).
+        if (product.stock !== undefined && product.stock !== null) {
+          product.stock = Number(product.stock) - quantity;
+          if (product.stock < 0) product.stock = 0;
+        }
         // Create booking record with productId and quantity.  Quantity
         // is calculated here so it can be displayed later without
         // recomputing tiers on the client.
@@ -932,8 +1088,12 @@ if (user && user.type === 'seller' && pathname.startsWith('/seller/products/dele
         appointment.bookingId = booking.id;
         data.bookings.push(booking);
         writeData(data);
-        // Notify seller and buyer
+        // Notify seller and buyer of booking
         broadcastEvent([appointment.sellerId, user.id], 'booking', { action: 'created', booking: Object.assign({}, booking, { buyerName: user.name }) });
+        // Broadcast updated stock to the seller and buyer so their interfaces can refresh
+        if (product.stock !== undefined && product.stock !== null) {
+          broadcastEvent([appointment.sellerId, user.id], 'stock', { productId: product.id, stock: product.stock });
+        }
         return redirect('/buyer/bookings');
       });
       return;

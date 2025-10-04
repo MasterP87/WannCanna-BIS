@@ -12,10 +12,13 @@
 <main>
 <div class="container">
 <form action="/seller/appointments/new" method="post">
-<label for="datetime">Datum und Uhrzeit:</label>
-<input id="datetime" name="datetime" required="" type="datetime-local"/>
+<label for="start">Start (Datum &amp; Zeit):</label>
+<input id="start" name="start" type="datetime-local" required />
+<label for="end">Ende (Datum &amp; Zeit, optional):</label>
+<input id="end" name="end" type="datetime-local" />
+<label><input type="checkbox" name="allDay" value="1"/> Ganztägig</label>
 <label for="location">Ort:</label>
-<input id="location" name="location" required="" type="text"/>
+<input id="location" name="location" required type="text" />
 <button type="submit">Erstellen</button>
 </form>
 <p><a href="/seller/dashboard">Zurück zum Dashboard</a></p>

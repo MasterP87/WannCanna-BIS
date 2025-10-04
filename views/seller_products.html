@@ -4,8 +4,62 @@
 <body><header><div class="brand"><img class="logo" src="/static/img/logo.png"/><span class="brand-name">WannCannaBis</span></div>
 <nav><a href="/">Start</a><a href="/seller/dashboard">Dashboard</a><a href="/seller/buyers">Käufer</a></nav></header>
 <main><div class="container"><h1>Portfolio</h1>
-<form method="post" class="row"><input class="grow" name="name" placeholder="Neues Produkt" required/><button type="submit" class="btn btn-accent">Anlegen</button></form>
-<div class="table-wrap mt-3"><table><thead><tr><th>Produkt</th><th>Aktion</th></tr></thead><tbody id="rows"></tbody></table></div>
+<form method="post" class="row">
+  <input class="grow" name="name" placeholder="Neues Produkt" required/>
+  <input style="max-width:150px;margin-left:0.5rem;" type="number" name="stock" placeholder="Bestand" min="0" step="0.01" required/>
+  <button type="submit" class="btn btn-accent">Anlegen</button>
+</form>
+<div class="table-wrap mt-3">
+  <table>
+    <thead>
+      <tr><th>Produkt</th><th>Bestand</th><th>Aktionen</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
 </div></main>
-<script>var products=JSON.parse('{{{products}}}'.replace(/&quot;/g,'"'));var tbody=document.getElementById('rows');products.forEach(p=>{var tr=document.createElement('tr');tr.innerHTML='<td>'+p.name+'</td><td><form method="post" action="/seller/products/delete/'+p.id+'" onsubmit="return confirm(\'Löschen?\')"><button type="submit">Löschen</button></form></td>';tbody.appendChild(tr);});</script>
+<script>
+var products=JSON.parse('{{{products}}}'.replace(/&quot;/g,'"'));
+var tbody=document.getElementById('rows');
+products.forEach(p=>{
+  var tr=document.createElement('tr');
+  // Name column
+  var nameTd=document.createElement('td');
+  nameTd.textContent=p.name;
+  tr.appendChild(nameTd);
+  // Stock column with update form
+  var stockTd=document.createElement('td');
+  var form=document.createElement('form');
+  form.method='post';
+  form.action='/seller/products/stock/'+p.id;
+  var input=document.createElement('input');
+  input.type='number';
+  input.name='stock';
+  input.min='0';
+  input.step='0.01';
+  input.required=true;
+  input.style.maxWidth='80px';
+  input.value=(p.stock!==undefined && p.stock!==null ? p.stock : '');
+  var button=document.createElement('button');
+  button.type='submit';
+  button.textContent='Aktualisieren';
+  form.appendChild(input);
+  form.appendChild(button);
+  stockTd.appendChild(form);
+  tr.appendChild(stockTd);
+  // Actions column with delete form
+  var actionsTd=document.createElement('td');
+  var delForm=document.createElement('form');
+  delForm.method='post';
+  delForm.action='/seller/products/delete/'+p.id;
+  delForm.onsubmit=function(){ return confirm('Löschen?'); };
+  var delBtn=document.createElement('button');
+  delBtn.type='submit';
+  delBtn.textContent='Löschen';
+  delForm.appendChild(delBtn);
+  actionsTd.appendChild(delForm);
+  tr.appendChild(actionsTd);
+  tbody.appendChild(tr);
+});
+</script>
 <footer>© WannCannaBis</footer></body></html>
