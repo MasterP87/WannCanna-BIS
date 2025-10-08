@@ -117,6 +117,11 @@
           app.booked = true;
           app.bookingId = msg.booking.id;
         }
+        // Notify seller about new booking.  Use a simple alert for now.
+        try {
+          const buyerName = msg.booking.buyerName || 'Unbekannt';
+          alert('Neue Buchung von ' + buyerName + ' über ' + msg.booking.amount.toFixed(2) + ' €');
+        } catch(e) {}
       } else if (msg.action === 'updated') {
         const idx = bookings.findIndex(b => b.id === msg.booking.id);
         if (idx >= 0) bookings[idx] = msg.booking;

@@ -1189,6 +1189,37 @@ if (user && user.type === 'seller' && pathname.startsWith('/seller/products/dele
     }); return;
   }
 
+  // Show details for a specific buyer, including current price tiers for each product.
+  // Only accessible to sellers for buyers that have already been approved.  Renders a
+  // page that displays the buyer's contact info and provides forms to adjust
+  // per-product price tiers.  Route: /seller/buyer/:id
+  if (user && user.type === 'seller' && pathname.startsWith('/seller/buyer/') && req.method === 'GET') {
+    const buyerIdStr = pathname.split('/').pop();
+    const buyerIdNum = parseInt(buyerIdStr, 10);
+    const buyer = data.users.find(u => u.id === buyerIdNum && u.type === 'buyer');
+    if (!buyer) {
+      return send(404, 'Käufer nicht gefunden');
+    }
+    // Check approval
+    const approvedEntry = (data.approvals || []).find(a => Number(a.sellerId) === user.id && Number(a.buyerId) === buyer.id && a.status === 'approved');
+    if (!approvedEntry) {
+      return send(403, 'Freischaltung erforderlich');
+    }
+    // Gather seller's products and tiers for this buyer
+    const products = findSellerProducts(data, user.id);
+    const tiersByProduct = {};
+    products.forEach(p => {
+      const tiers = getBuyerTiersForProduct(p, buyer.id);
+      tiersByProduct[p.id] = tiers || [];
+    });
+    const html = renderTemplate('seller_buyer_details', {
+      buyer: JSON.stringify(buyer),
+      products: JSON.stringify(products),
+      tiers: JSON.stringify(tiersByProduct)
+    });
+    return send(200, html);
+  }
+
   if (user && user.type === 'seller' && isSellerActive(user)) {
     // Seller dashboard
     if (pathname === '/seller/dashboard') {

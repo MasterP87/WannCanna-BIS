@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Käuferdetails – WannCannaBis</title>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img class="logo" src="/static/img/logo.png" alt="WannCannaBis Logo"/>
+      <span class="brand-name">WannCannaBis</span>
+    </div>
+    <nav>
+      <a href="/">Start</a>
+      <a href="/seller/dashboard">Dashboard</a>
+      <a href="/seller/appointments/new">Neuer Termin</a>
+      <a href="/seller/products">Produkte</a>
+      <a href="/seller/buyers">Käufer</a>
+      <a href="/seller/messages">Nachrichten</a>
+      <a href="/seller/key">Freischaltcode</a>
+      <a href="/logout">Abmelden</a>
+    </nav>
+  </header>
+  <main>
+    <div class="container">
+      <h1>Käuferdetails</h1>
+      <p><strong>Name:</strong> <span id="buyerName"></span></p>
+      <p><strong>E‑Mail:</strong> <span id="buyerEmail"></span></p>
+      <p><strong>Telefon:</strong> <span id="buyerPhone"></span></p>
+
+      <h2>Preisstaffelungen</h2>
+      <div id="productTiers"></div>
+    </div>
+  </main>
+  <script>
+    // Eingebettete Daten: buyer, products, tiersByProduct
+    var buyer = JSON.parse('{{{buyer}}}'.replace(/&quot;/g, '"'));
+    var products = JSON.parse('{{{products}}}'.replace(/&quot;/g, '"'));
+    var tiersByProduct = JSON.parse('{{{tiers}}}'.replace(/&quot;/g, '"'));
+
+    // Set buyer info
+    document.getElementById('buyerName').textContent = buyer.name;
+    document.getElementById('buyerEmail').textContent = buyer.email;
+    document.getElementById('buyerPhone').textContent = buyer.phone;
+
+    var container = document.getElementById('productTiers');
+    products.forEach(function(prod) {
+      var div = document.createElement('div');
+      div.className = 'product-tier-block';
+      div.innerHTML = '<h3>' + prod.name + '</h3>';
+      var tiers = tiersByProduct[prod.id] || [];
+      var formHtml = '<form method="post" action="/seller/buyers/tiers" onsubmit="return prepareTiers(this)">';
+      formHtml += '<input type="hidden" name="buyerId" value="' + buyer.id + '"/>';
+      formHtml += '<input type="hidden" name="productId" value="' + prod.id + '"/>';
+      formHtml += '<div class="tier-lines">';
+      // Existing tiers: create input lines populated with values
+      if (tiers && tiers.length) {
+        tiers.forEach(function(t, idx) {
+          formHtml += '<div class="tier-line">' +
+            '<input type="number" name="min' + idx + '" step="1" min="0" placeholder="Von" required value="' + t.minAmount + '" style="width:60px;"/>' +
+            '<input type="number" name="max' + idx + '" step="1" min="0" placeholder="Bis" value="" style="width:60px;"/>' +
+            '<input type="number" name="price' + idx + '" step="0.01" min="0" placeholder="Preis" required value="' + t.unitPrice + '" style="width:80px;"/>' +
+            '</div>';
+        });
+      } else {
+        // Single empty line if no tiers
+        formHtml += '<div class="tier-line">' +
+          '<input type="number" name="min0" step="1" min="0" placeholder="Von" required style="width:60px;"/>' +
+          '<input type="number" name="max0" step="1" min="0" placeholder="Bis" style="width:60px;"/>' +
+          '<input type="number" name="price0" step="0.01" min="0" placeholder="Preis" required style="width:80px;"/>' +
+          '</div>';
+      }
+      formHtml += '</div>';
+      formHtml += '<button type="button" onclick="addTierRow(this.form)" class="btn">+</button> ';
+      formHtml += '<button type="submit" class="btn">Speichern</button>';
+      formHtml += '</form>';
+      div.innerHTML += formHtml;
+      container.appendChild(div);
+    });
+
+    function addTierRow(form) {
+      var lines = form.querySelector('.tier-lines');
+      var count = lines.querySelectorAll('.tier-line').length;
+      var div = document.createElement('div');
+      div.className = 'tier-line';
+      div.innerHTML = '<input type="number" name="min' + count + '" step="1" min="0" placeholder="Von" required style="width:60px;"/>' +
+        '<input type="number" name="max' + count + '" step="1" min="0" placeholder="Bis" style="width:60px;"/>' +
+        '<input type="number" name="price' + count + '" step="0.01" min="0" placeholder="Preis" required style="width:80px;"/>';
+      lines.appendChild(div);
+    }
+
+    function prepareTiers(form) {
+      var lines = form.querySelectorAll('.tier-line');
+      var parts = [];
+      lines.forEach(function(line) {
+        var minInput = line.querySelector('input[name^="min"]');
+        var priceInput = line.querySelector('input[name^="price"]');
+        var minVal = parseFloat(minInput.value);
+        var priceVal = parseFloat(priceInput.value);
+        if (!isNaN(minVal) && !isNaN(priceVal)) {
+          parts.push(minVal + ';' + priceVal);
+        }
+      });
+      if (parts.length === 0) {
+        alert('Bitte mindestens eine Staffel eintragen');
+        return false;
+      }
+      var hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = 'tiers';
+      hidden.value = parts.join('\n');
+      form.appendChild(hidden);
+      return true;
+    }
+  </script>
+  <footer>© WannCannaBis</footer>
+</body>
+</html>

@@ -36,7 +36,7 @@ approved.forEach(a=>{products.forEach(p=>{
   // Build a dynamic tier form.  Sellers can add rows with Von/Bis/Preis fields.
   // The prepareTiers() function will convert these fields into the expected
   // "tiers" string on submission.
-  tr.innerHTML='<td>'+buyerName(a.buyerId)+'</td><td>'+p.name+'</td><td>'+
+  tr.innerHTML='<td><a href="/seller/buyer/'+a.buyerId+'">'+buyerName(a.buyerId)+'</a></td><td>'+p.name+'</td><td>'+
     '<form method="post" action="/seller/buyers/tiers" onsubmit="return prepareTiers(this)" class="tier-form">'+
     '<input type="hidden" name="buyerId" value="'+a.buyerId+'"/>'+ 
     '<input type="hidden" name="productId" value="'+p.id+'"/>'+ 
