@@ -7,11 +7,26 @@
 <title>Verkäufer-Dashboard</title>
 <link href="/static/css/style.css" rel="stylesheet"/></head>
 <body onload="AppointmentApp.initSellerDashboard()">
-<header><div class="brand"><img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/><span class="brand-name">WannCannaBis</span></div><nav><a href="/">Start</a><a href="/login">Login</a><a href="/register">Registrieren</a><a href="/admin">Admin</a></nav></header>
+<header>
+  <div class="brand">
+    <img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/>
+    <span class="brand-name">WannCannaBis</span>
+  </div>
+  <!-- Navigationsleiste für Verkäufer mit mehreren Reitern -->
+  <nav>
+    <a href="/">Start</a>
+    <a href="/seller/dashboard">Dashboard</a>
+    <a href="/seller/appointments/new">Neuer Termin</a>
+    <a href="/seller/products">Produkte</a>
+    <a href="/seller/buyers">Käufer</a>
+    <a href="/seller/messages">Nachrichten</a>
+    <a href="/seller/key">Freischaltcode</a>
+    <a href="/logout">Abmelden</a>
+  </nav>
+</header>
 <main>
 <div class="container">
-<p>Willkommen, {{userName}} (Verkäufer-Nr.: {{sellerNumber}}) | <a href="/seller/products">Portfolio</a> | <a href="/seller/buyers">Käufer</a></p>
-<p><a href="/seller/appointments/new">Neuen Termin erstellen</a> | <a href="/seller/request-code">Freischaltcode anfordern</a> | <a href="/logout">Abmelden</a></p>
+<p>Willkommen, {{userName}} (Verkäufer-Nr.: {{sellerNumber}})</p>
 <h2>Termine</h2>
 <table id="appointmentsTable">
 <thead>

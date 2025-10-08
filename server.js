@@ -499,6 +499,12 @@ function handleRequest(req, res) {
   const parsed = url.parse(req.url, true);
   const pathname = parsed.pathname;
   const data = readData();
+  // Ensure new collections exist so they persist across requests.  Messages store
+  // simple communication objects, and codeRequests collects seller requests for
+  // new activation keys.  Initialise them if they are missing so that other
+  // code can safely push into these arrays without additional guards.
+  data.messages = data.messages || [];
+  data.codeRequests = data.codeRequests || [];
   // Periodically clean up expired appointments and stale bookings.  If
   // any data is removed, persist the updated state.  Doing this at
   // request time ensures that stale records disappear at most a few
@@ -602,17 +608,10 @@ function handleRequest(req, res) {
   
 
 /* Admin routes */
-if (pathname === '/admin/login' && req.method === 'GET') {
-  const html = renderTemplate('admin_login', {}); return send(200, html);
-}
-if (pathname === '/admin/login' && req.method === 'POST') {
-  collectPostData(req, body => {
-    const { username, password } = body;
-    if (data.admin && username === data.admin.username && data.admin.password === hashPassword(password)) {
-      session.isAdmin = true; return redirect('/admin');
-    }
-    return send(401, 'Login fehlgeschlagen');
-  }); return;
+// Deprecated admin login endpoint.  Admins now log in via /login using the
+// username "admin".  Redirect any requests to the unified login page.
+if (pathname === '/admin/login' && (req.method === 'GET' || req.method === 'POST')) {
+  return redirect('/login');
 }
 if (pathname === '/admin/logout') { session.isAdmin = false; return redirect('/'); }
 function requireAdmin(){ return session.isAdmin === true; }
@@ -772,6 +771,54 @@ if (pathname === '/admin/password' && req.method === 'POST') {
    });
    return;
  }
+
+ // Admin messages management.  Displays all messages and allows sending new ones to users.
+ if (pathname === '/admin/messages') {
+   if (!requireAdmin()) return redirect('/login');
+   const msgs = data.messages || [];
+   const html = renderTemplate('admin_messages', {
+     messages: JSON.stringify(msgs),
+     users: JSON.stringify(data.users || [])
+   });
+   return send(200, html);
+ }
+ // Admin send message.  Admin can target everyone, all buyers, all sellers or an individual.
+ if (pathname === '/admin/messages/send' && req.method === 'POST') {
+   if (!requireAdmin()) return redirect('/login');
+   collectPostData(req, body => {
+     const target = (body.to || '').trim();
+     const content = (body.message || '').trim();
+     if (!content) {
+       return send(400, 'Nachricht darf nicht leer sein');
+     }
+     let recipients = [];
+     if (target === 'all') {
+       recipients = (data.users || []).map(u => u.id);
+     } else if (target === 'buyers') {
+       recipients = (data.users || []).filter(u => u.type === 'buyer').map(u => u.id);
+     } else if (target === 'sellers') {
+       recipients = (data.users || []).filter(u => u.type === 'seller').map(u => u.id);
+     } else {
+       const uid = parseInt(target, 10);
+       if (!isNaN(uid)) recipients.push(uid);
+     }
+     recipients.forEach(rid => {
+       const msg = {
+         id: generateId(12),
+         from: 'admin',
+         to: rid,
+         toRole: null,
+         body: content,
+         createdAt: Date.now(),
+         read: false
+       };
+       data.messages.push(msg);
+     });
+     writeData(data);
+     return redirect('/admin/messages');
+   });
+   return;
+ }
 // Registration page
   if (pathname === '/register' && req.method === 'GET') {
     const html = renderTemplate('register', {});
@@ -853,6 +900,9 @@ const newUser = {
   }
 
   // Login
+  // Unified login for buyers, sellers and the admin.  Admins log in via the
+  // same form using the username "admin" in the E‑Mail field.  An optional
+  // error parameter on the query string triggers an error message.
   if (pathname === '/login' && req.method === 'GET') {
     let errorMsg = '';
     if (parsed.query.error) {
@@ -864,7 +914,15 @@ const newUser = {
   if (pathname === '/login' && req.method === 'POST') {
     collectPostData(req, body => {
       const { email, password } = body;
-      const found = data.users.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
+      const loginName = (email || '').trim().toLowerCase();
+      // Admin credentials: use the email/username field to log in as admin
+      if (data.admin && loginName === (data.admin.username || 'admin').toLowerCase() && comparePassword(password || '', data.admin.password)) {
+        session.isAdmin = true;
+        // Admin sessions do not set userId, leaving userId undefined
+        return redirect('/admin/keys');
+      }
+      // Regular user authentication
+      const found = data.users.find(u => u.email.toLowerCase() === loginName);
       if (!found || !comparePassword(password || '', found.password)) {
         return redirect('/login?error=1');
       }
@@ -966,6 +1024,106 @@ if (user && user.type === 'seller' && pathname.startsWith('/seller/products/dele
   return redirect('/seller/products');
 }
 
+  // Seller key management page: display current expiry and allow entering a new key
+  if (user && user.type === 'seller' && pathname === '/seller/key') {
+    if (req.method === 'GET') {
+      const exp = user.accessUntil || null;
+      const html = renderTemplate('seller_key', { expiry: exp });
+      return send(200, html);
+    }
+    if (req.method === 'POST') {
+      collectPostData(req, body => {
+        const codeInput = (body.code || '').trim().toUpperCase();
+        if (!codeInput) {
+          return send(400, 'Schlüssel erforderlich');
+        }
+        const key = (data.keys || []).find(k => k.code === codeInput);
+        if (!key) {
+          return send(400, 'Ungültiger Schlüssel');
+        }
+        // Check key usage limits
+        let usedCount = 0;
+        if (Array.isArray(key.usedBy)) usedCount = key.usedBy.length;
+        else if (key.usedBy) usedCount = 1;
+        const allowed = key.maxUses || 1;
+        if (usedCount >= allowed) {
+          return send(400, 'Schlüssel hat die maximale Anzahl an Nutzungen erreicht');
+        }
+        if (key.expiresAt && Date.now() > key.expiresAt) {
+          return send(400, 'Schlüssel abgelaufen');
+        }
+        // Ensure usedBy is an array
+        if (!Array.isArray(key.usedBy)) {
+          key.usedBy = key.usedBy ? [key.usedBy] : [];
+        }
+        if (!key.usedBy.includes(user.id)) {
+          key.usedBy.push(user.id);
+        }
+        // Update status
+        if (key.usedBy.length >= allowed) key.status = 'used';
+        else key.status = 'partial';
+        // Update seller's accessUntil
+        user.accessUntil = key.expiresAt;
+        writeData(data);
+        return redirect('/seller/dashboard');
+      });
+      return;
+    }
+  }
+
+  // Seller messages page: list messages and send new ones
+  if (user && user.type === 'seller' && pathname === '/seller/messages') {
+    if (req.method === 'GET') {
+      // Filter messages addressed to this seller or sent by them, or broadcast to all sellers
+      const msgs = (data.messages || []).filter(m => {
+        const toMatch = (String(m.to) === String(user.id)) || (m.to === 'all' && (!m.toRole || m.toRole === 'seller'));
+        const fromMatch = String(m.from) === String(user.id);
+        return toMatch || fromMatch;
+      });
+      // Determine approved buyers for this seller
+      const approved = (data.approvals || []).filter(a => a.sellerId === user.id && a.status === 'approved');
+      const buyersList = data.users.filter(u => u.type === 'buyer' && approved.some(a => a.buyerId === u.id));
+      const html = renderTemplate('seller_messages', {
+        messages: JSON.stringify(msgs),
+        buyers: JSON.stringify(buyersList)
+      });
+      return send(200, html);
+    }
+    if (req.method === 'POST') {
+      collectPostData(req, body => {
+        const toId = body.to || '';
+        const content = (body.message || '').trim();
+        if (!content) {
+          return send(400, 'Nachricht darf nicht leer sein');
+        }
+        // Determine recipients: all approved buyers or a specific buyer
+        const recipients = [];
+        if (toId === 'all') {
+          const approved = (data.approvals || []).filter(a => a.sellerId === user.id && a.status === 'approved');
+          approved.forEach(a => recipients.push(a.buyerId));
+        } else {
+          const rid = parseInt(toId, 10);
+          if (!isNaN(rid)) recipients.push(rid);
+        }
+        recipients.forEach(rid => {
+          const msg = {
+            id: generateId(12),
+            from: user.id,
+            to: rid,
+            toRole: 'buyer',
+            body: content,
+            createdAt: Date.now(),
+            read: false
+          };
+          data.messages.push(msg);
+        });
+        writeData(data);
+        return redirect('/seller/messages');
+      });
+      return;
+    }
+  }
+
     // Update product stock.  Accepts POST to /seller/products/stock/:id with a
     // 'stock' field.  Only the owning seller may update the stock.  After
     // updating, broadcasts a 'stock' SSE event to the seller and approved
@@ -1062,39 +1220,83 @@ if (user && user.type === 'seller' && pathname.startsWith('/seller/products/dele
       collectPostData(req, body => {
         // Accept start, optional end and allDay flags for new appointments.  A
         // start (datetime-local) and location are required.  If allDay is
-        // checked, the end field will be ignored.  For compatibility with
-        // existing code, we also set the `datetime` property equal to the
-        // start value.
+        // checked, the end field will be ignored.
         const start = body.start || body.datetime;
         const end = body.end;
         const allDay = body.allDay ? true : false;
         const location = body.location;
+        const days = body.days; // may be undefined, string or array
         if (!start || !location) {
           return send(400, 'Datum/Zeit und Ort erforderlich');
         }
-        // Validate that end, if provided, is after start and in the same day if needed.
+        // Validate that end, if provided, is after start
         if (!allDay && end) {
-          const startDate = new Date(start);
-          const endDate = new Date(end);
-          if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate <= startDate) {
+          const sDate = new Date(start);
+          const eDate = new Date(end);
+          if (isNaN(sDate.getTime()) || isNaN(eDate.getTime()) || eDate <= sDate) {
             return send(400, 'Endzeit muss nach Startzeit liegen');
           }
         }
-        const appointment = {
-          id: data.nextAppointmentId++,
-          sellerId: user.id,
-          datetime: start,
-          start,
-          end: allDay ? null : (end || null),
-          allDay,
-          location,
-          booked: false,
-          bookingId: null
-        };
-        data.appointments.push(appointment);
+        // Helper to create and store an appointment
+        function addAppointment(s, e, ad) {
+          const app = {
+            id: data.nextAppointmentId++,
+            sellerId: user.id,
+            datetime: s,
+            start: s,
+            end: ad ? null : (e || null),
+            allDay: ad,
+            location,
+            booked: false,
+            bookingId: null
+          };
+          data.appointments.push(app);
+          broadcastEvent(user.id, 'appointment', { action: 'created', appointment: app });
+        }
+        const startDate = new Date(start);
+        const endDateObj = end ? new Date(end) : null;
+        // Determine selected weekdays from the form.  Accept both string and array
+        let dayList = [];
+        if (days) {
+          if (Array.isArray(days)) dayList = days;
+          else dayList = [days];
+        }
+        if (dayList.length === 0) {
+          // Single appointment on the specified start date/time
+          addAppointment(start, end, allDay);
+        } else {
+          // Map abbreviations to JavaScript day numbers (0 = Sunday, 1 = Monday, ...)
+          const dayMap = { mo: 1, di: 2, mi: 3, do: 4, fr: 5, sa: 6, so: 0 };
+          const baseDay = startDate.getDay();
+          dayList.forEach(d => {
+            const key = String(d).toLowerCase();
+            const targetDay = dayMap[key];
+            if (targetDay === undefined) return;
+            let diff = targetDay - baseDay;
+            if (diff < 0) diff += 7;
+            const newStartDate = new Date(startDate.getTime());
+            newStartDate.setDate(startDate.getDate() + diff);
+            // Format as local datetime-local string (YYYY-MM-DDTHH:MM)
+            const pad = n => String(n).padStart(2, '0');
+            const toInput = (dt) => {
+              const y = dt.getFullYear();
+              const m = pad(dt.getMonth() + 1);
+              const dstr = pad(dt.getDate());
+              const hr = pad(dt.getHours());
+              const mn = pad(dt.getMinutes());
+              return `${y}-${m}-${dstr}T${hr}:${mn}`;
+            };
+            const newStartStr = toInput(newStartDate);
+            let newEndStr = null;
+            if (!allDay && endDateObj) {
+              const newEndDate = new Date(endDateObj.getTime());
+              newEndDate.setDate(endDateObj.getDate() + diff);
+              newEndStr = toInput(newEndDate);
+            }
+            addAppointment(newStartStr, newEndStr, allDay);
+          });
+        }
         writeData(data);
-        // Notify seller dashboard of new appointment
-        broadcastEvent(user.id, 'appointment', { action: 'created', appointment });
         return redirect('/seller/dashboard');
       });
       return;

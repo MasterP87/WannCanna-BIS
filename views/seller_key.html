@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Freischaltcode anfordern – WannCannaBis</title>
+  <title>Freischaltcode – Verkäufer</title>
   <link rel="stylesheet" href="/static/css/style.css"/>
 </head>
 <body>
@@ -25,14 +25,28 @@
 </header>
 <main>
   <div class="container">
-    <h1>Freischaltcode anfordern</h1>
-    <p>Sie können hier einen neuen Freischaltcode bei einem Administrator anfordern. Nach dem Absenden der Anfrage wird ein Administrator Ihre Anfrage prüfen und Ihnen ggf. einen neuen Code zuteilen.</p>
-    <form method="post" action="/seller/request-code">
-      <button type="submit" class="btn btn-accent">Anfrage senden</button>
+    <h1>Freischaltcode</h1>
+    <p>Aktuelle Gültigkeit: <strong><span id="expiryText"></span></strong></p>
+    <form method="post" action="/seller/key" class="row">
+      <input type="text" name="code" placeholder="Neuen Freischaltcode" required class="grow"/>
+      <button type="submit" class="btn btn-accent">Aktivieren</button>
     </form>
-    <p><a href="/seller/dashboard">Zurück zum Dashboard</a></p>
+    <p class="helper">Bitte geben Sie einen gültigen Code ein, um den Zugang zu verlängern.</p>
   </div>
 </main>
+<script>
+// Embedded expiry from server side
+var expiry = {{expiry}};
+function fmt(ts) {
+  if (!ts) return '—';
+  try {
+    return new Intl.DateTimeFormat(undefined, { dateStyle:'medium', timeStyle:'short' }).format(new Date(ts));
+  } catch (e) {
+    return ts;
+  }
+}
+document.getElementById('expiryText').textContent = fmt(expiry);
+</script>
 <footer>© WannCannaBis</footer>
 </body>
 </html>
