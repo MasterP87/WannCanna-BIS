@@ -524,8 +524,14 @@ function handleRequest(req, res) {
   // Ensure a default admin account exists.  If no admin is defined in
   // the data store, initialize one with the default credentials.  The
   // password is stored as a SHA‑256 hash to avoid persisting plain text.
+  // Ensure a default admin account exists.  If no admin is defined in
+  // the data store, initialise one using the configured default
+  // credentials.  The username has been changed to an email address
+  // (admin@example.com) so that it can be entered in an email field on
+  // the login form.  The default password has been updated to
+  // 80791010 as requested.
   if (!data.admin) {
-    data.admin = { username: 'admin', password: hashPassword('admin1234!') };
+    data.admin = { username: 'admin@example.com', password: hashPassword('80791010') };
     writeData(data);
   }
   // Ensure the codeRequests list exists for tracking seller code
@@ -915,8 +921,21 @@ const newUser = {
     collectPostData(req, body => {
       const { email, password } = body;
       const loginName = (email || '').trim().toLowerCase();
-      // Admin credentials: use the email/username field to log in as admin
-      if (data.admin && loginName === (data.admin.username || 'admin').toLowerCase() && comparePassword(password || '', data.admin.password)) {
+      // Determine valid admin usernames.  Always include the current
+      // configured username, the legacy "admin" user and the new
+      // admin@example.com alias.  This allows existing deployments to
+      // continue working while supporting the new email-based admin
+      // login.
+      const adminCandidates = [];
+      if (data.admin && data.admin.username) {
+        adminCandidates.push(String(data.admin.username).toLowerCase());
+      }
+      // Legacy admin account with username "admin"
+      adminCandidates.push('admin');
+      // New email-based admin account
+      adminCandidates.push('admin@example.com');
+      // Check admin credentials
+      if (adminCandidates.includes(loginName) && data.admin && comparePassword(password || '', data.admin.password)) {
         session.isAdmin = true;
         // Admin sessions do not set userId, leaving userId undefined
         return redirect('/admin/keys');
@@ -1187,37 +1206,6 @@ if (user && user.type === 'seller' && pathname.startsWith('/seller/products/dele
       if(!tiers.length) return send(400,'Keine gültige Staffel');
       tiers.sort((a,b)=>a.minAmount-b.minAmount); setBuyerTiersForProduct(product, buyerId, tiers); writeData(data); return redirect('/seller/buyers');
     }); return;
-  }
-
-  // Show details for a specific buyer, including current price tiers for each product.
-  // Only accessible to sellers for buyers that have already been approved.  Renders a
-  // page that displays the buyer's contact info and provides forms to adjust
-  // per-product price tiers.  Route: /seller/buyer/:id
-  if (user && user.type === 'seller' && pathname.startsWith('/seller/buyer/') && req.method === 'GET') {
-    const buyerIdStr = pathname.split('/').pop();
-    const buyerIdNum = parseInt(buyerIdStr, 10);
-    const buyer = data.users.find(u => u.id === buyerIdNum && u.type === 'buyer');
-    if (!buyer) {
-      return send(404, 'Käufer nicht gefunden');
-    }
-    // Check approval
-    const approvedEntry = (data.approvals || []).find(a => Number(a.sellerId) === user.id && Number(a.buyerId) === buyer.id && a.status === 'approved');
-    if (!approvedEntry) {
-      return send(403, 'Freischaltung erforderlich');
-    }
-    // Gather seller's products and tiers for this buyer
-    const products = findSellerProducts(data, user.id);
-    const tiersByProduct = {};
-    products.forEach(p => {
-      const tiers = getBuyerTiersForProduct(p, buyer.id);
-      tiersByProduct[p.id] = tiers || [];
-    });
-    const html = renderTemplate('seller_buyer_details', {
-      buyer: JSON.stringify(buyer),
-      products: JSON.stringify(products),
-      tiers: JSON.stringify(tiersByProduct)
-    });
-    return send(200, html);
   }
 
   if (user && user.type === 'seller' && isSellerActive(user)) {

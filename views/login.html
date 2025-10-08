@@ -8,24 +8,13 @@
 
 <link href="/static/css/style.css" rel="stylesheet"/></head>
 <body>
-<header>
-  <div class="brand">
-    <img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/>
-    <span class="brand-name">WannCannaBis</span>
-  </div>
-  <nav>
-    <a href="/">Start</a>
-    <a href="/login">Login</a>
-    <a href="/register">Registrieren</a>
-  </nav>
-</header>
+<header><div class="brand"><img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/><span class="brand-name">WannCannaBis</span></div><nav><a href="/">Start</a><a href="/login">Login</a><a href="/register">Registrieren</a><a href="/admin">Admin</a></nav></header>
 <main>
 <div class="container">
       {{errorMessage}}
       <form action="/login" method="post">
-<label for="email">E‑Mail bzw. Benutzername:</label>
-<!-- Verwende type="text", damit auch "admin" ohne @ akzeptiert wird -->
-<input id="email" name="email" required type="text"/>
+<label for="email">E‑Mail:</label>
+<input id="email" name="email" required="" type="email"/>
 <label for="password">Passwort:</label>
 <input id="password" name="password" required="" type="password"/>
 <button type="submit">Anmelden</button>

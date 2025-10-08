@@ -8,22 +8,7 @@
 
 <link href="/static/css/style.css" rel="stylesheet"/></head>
 <body>
-<header>
-  <div class="brand">
-    <img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/>
-    <span class="brand-name">WannCannaBis</span>
-  </div>
-  <nav>
-    <a href="/">Start</a>
-    <a href="/seller/dashboard">Dashboard</a>
-    <a href="/seller/appointments/new">Neuer Termin</a>
-    <a href="/seller/products">Produkte</a>
-    <a href="/seller/buyers">Käufer</a>
-    <a href="/seller/messages">Nachrichten</a>
-    <a href="/seller/key">Freischaltcode</a>
-    <a href="/logout">Abmelden</a>
-  </nav>
-</header>
+<header><div class="brand"><img alt="WannCannaBis Logo" class="logo" src="/static/img/logo.png"/><span class="brand-name">WannCannaBis</span></div><nav><a href="/">Start</a><a href="/login">Login</a><a href="/register">Registrieren</a><a href="/admin">Admin</a></nav></header>
 <main>
 <div class="container">
 <form action="/seller/appointments/new" method="post">
@@ -32,17 +17,6 @@
 <label for="end">Ende (Datum &amp; Zeit, optional):</label>
 <input id="end" name="end" type="datetime-local" />
 <label><input type="checkbox" name="allDay" value="1"/> Ganztägig</label>
-<label>Wochentage (optional):
-  <span class="weekday-select">
-    <label><input type="checkbox" name="days" value="mo"/> Mo</label>
-    <label><input type="checkbox" name="days" value="di"/> Di</label>
-    <label><input type="checkbox" name="days" value="mi"/> Mi</label>
-    <label><input type="checkbox" name="days" value="do"/> Do</label>
-    <label><input type="checkbox" name="days" value="fr"/> Fr</label>
-    <label><input type="checkbox" name="days" value="sa"/> Sa</label>
-    <label><input type="checkbox" name="days" value="so"/> So</label>
-  </span>
-</label>
 <label for="location">Ort:</label>
 <input id="location" name="location" required type="text" />
 <button type="submit">Erstellen</button>
